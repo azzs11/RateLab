@@ -1,210 +1,139 @@
-# 🚀 Distributed Rate Limiter
+# Distributed Rate Limiter
 
 <div align="center">
 
-![Rust](https://img.shields.io/badge/Rust-1.75+-orange?logo=rust)
+[![Rust CI](https://github.com/azzs11/distributed-rate-limiter/actions/workflows/rust.yml/badge.svg)](https://github.com/azzs11/distributed-rate-limiter/actions/workflows/rust.yml)
 ![License](https://img.shields.io/badge/License-MIT-blue)
-![Stars](https://img.shields.io/github/stars/Akchhya1108/distributed-rate-limiter?style=social)
+![Stars](https://img.shields.io/github/stars/azzs11/distributed-rate-limiter?style=social)
 
-**High-performance distributed rate limiter built in Rust**
+**Rate limiting algorithms in Rust (token bucket, leaky bucket, fixed and sliding window) with a Redis-backed prototype.**
 
-[Features](#-features) • [Demo](#-demo) • [Quick Start](#-quick-start) • [Benchmarks](#-benchmarks) • [Documentation](#-documentation)
+[Features](#features) • [Quick Start](#quick-start) • [Benchmarks](#benchmarks) • [Roadmap](#roadmap)
 
 </div>
 
 ---
 
-## 🎯 Overview
+## Overview
 
-Production-grade rate limiting infrastructure supporting multiple algorithms, distributed coordination via Redis, real-time monitoring with Prometheus, and an interactive web dashboard. Achieves **140,000+ requests/second** with sub-millisecond latency.
+This crate implements four classic rate limiting algorithms behind one
+`RateLimiter` trait. It also includes Prometheus metrics, a small Actix web
+dashboard for trying the algorithms interactively, and a Redis-backed token
+bucket prototype.
 
-### Key Highlights
-
-- 🔥 **140K+ req/s** throughput (proven via benchmarks)
-- ⚡ **<1ms P99 latency** for all algorithms
-- 🎨 **Beautiful web dashboard** with real-time visualization
-- 🔄 **4 rate limiting algorithms** (Token Bucket, Leaky Bucket, Fixed/Sliding Window)
-- 🌐 **Distributed mode** using Redis with atomic Lua scripts
-- 📊 **Prometheus metrics** for production monitoring
-- 🧪 **Comprehensive testing** with load tests and benchmarks
+The project is being reworked into a rate limiter that **measures and reports
+its own accuracy**. See [docs/ROADMAP.md](docs/ROADMAP.md) for the plan.
 
 ---
 
-## ✨ Features
+## Features
 
-### Algorithms
+### Algorithms (in-process)
 
-| Algorithm | Throughput | Latency (P99) | Memory | Best For |
-|-----------|------------|---------------|---------|----------|
-| **Token Bucket** | 140K req/s | <850µs | Low | General APIs, variable traffic |
-| **Leaky Bucket** | 136K req/s | <900µs | Low | Streaming, constant output |
-| **Fixed Window** | 172K req/s ⚡ | <500µs 🏆 | Very Low | High-traffic APIs |
-| **Sliding Window** | 75K req/s | <1.4ms | High | Precision, high-value APIs |
+| Algorithm | How it works | Trade-off |
+|-----------|--------------|-----------|
+| **Token Bucket** | Tokens refill at a constant rate; each request spends one | Allows bursts up to the bucket size |
+| **Leaky Bucket** | Requests fill a bucket that drains at a constant rate | Smooths bursts; bursty traffic gets rejected |
+| **Fixed Window** | Counts requests per fixed time window | Simplest; can admit a burst above the limit around a window boundary |
+| **Sliding Window** | Stores each request timestamp in the window | Exact limit, but memory grows with the limit |
 
-### Infrastructure
+These limiters keep state in a per-instance `HashMap`. They are **not**
+shared between processes.
 
-- ✅ **Redis Integration** - Distributed coordination with Lua scripts
-- ✅ **Circuit Breaker** - Graceful degradation on failures
-- ✅ **Prometheus Metrics** - Real-time observability
-- ✅ **Multi-tier Limits** - User/IP/endpoint/global support
-- ✅ **Web Dashboard** - Interactive testing and visualization
+### Redis prototype
+
+`RedisRateLimiter` (`src/redis_limiter.rs`) runs a token bucket as an atomic
+Lua script in Redis, so several processes could share one limit. It is a
+**prototype**:
+
+- The web server does **not** use it yet. The dashboard only runs the
+  in-process algorithms.
+- It opens a new Redis connection on every request.
+- `check_with_fallback` fails open (allows the request) when Redis is
+  unreachable. That is a fallback, not a circuit breaker.
+
+### Other
+
+- **Prometheus metrics:** request counters and a latency histogram (`src/metrics.rs`)
+- **Web dashboard:** run a burst of requests against any algorithm and see allowed/blocked results
 
 ---
 
-## 🎮 Demo
+## Demo
 
-### Web Dashboard UI
-
-#### Request Flow + Rate Limiting View
-<p align="center">
-  <img src="docs/screenshots/Alg_1.png" width="45%" />
-  <img src="docs/screenshots/Alg_2.png" width="45%" />
-</p>
-
----
-
-### Metrics Monitoring (Prometheus)
+### Web dashboard
 
 <p align="center">
   <img src="docs/screenshots/Metrics_1.png" width="45%" />
   <img src="docs/screenshots/Metrics_graph_1.png" width="45%" />
 </p>
 
----
+<p align="center"><em>Screenshots of one local run. The values come from the dashboard on that machine; they are not benchmark results.</em></p>
 
-### Algorithm Performance Comparison
+### Algorithm guide
 
 <p align="center">
-  <img src="docs/screenshots/Performance_Comp_Alg.png" width="70%" />
+  <img src="docs/screenshots/Alg_1.png" width="70%" />
 </p>
 
----
-
-### Features:
-- 📊 Real-time metrics cards
-- 🎯 Interactive rate limit simulator
-- 📈 Live charts showing request patterns
-- 🌈 Visual allowed/blocked request indicators
-- 📊 Algorithm comparison page
-
-### Quick Demo:
 ```bash
-# Start the web server
 cargo run --bin web-server
-
-# Open browser
-http://localhost:3000
+# then open http://localhost:3001
 ```
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
-- Rust 1.75+ ([Install](https://rustup.rs/))
-- Redis (optional, for distributed mode)
+- Rust (stable) via [rustup](https://rustup.rs/)
+- Redis (optional, only for the Redis prototype)
 
 ### Installation
+
 ```bash
-# Clone repository
-git clone https://github.com/Akchhya1108/distributed-rate-limiter.git
+git clone https://github.com/azzs11/distributed-rate-limiter.git
 cd distributed-rate-limiter
 
-# Build
 cargo build --release
-
-# Run tests
 cargo test
-
-# Run benchmarks
-cargo bench
 ```
 
-### Basic Usage
-```rust
-use distributed_rate_limiter::{RateLimiter, RateLimitConfig};
-use distributed_rate_limiter::algorithms::TokenBucket;
+### Basic usage
 
-// Create rate limiter: 100 requests per second
+```rust
+use distributed_rate_limiter::algorithms::TokenBucket;
+use distributed_rate_limiter::{RateLimitConfig, RateLimiter};
+
+// 100 requests per second
 let config = RateLimitConfig::per_second(100);
 let mut limiter = TokenBucket::new(config);
 
-// Check if request is allowed
 if limiter.allow_request("user_123").unwrap() {
-    // Process request
-    println!("✅ Request allowed");
+    println!("Request allowed");
 } else {
-    // Reject request
-    println!("❌ Rate limit exceeded");
+    println!("Rate limit exceeded");
 }
 ```
 
-### Web Dashboard
-```bash
-# Start web server
-cargo run --bin web-server
+### Redis prototype
 
-# Open http://localhost:3000 in browser
-```
-
----
-
-## 📊 Benchmarks
-
-### Performance Results
-
-**Environment**: Windows 11, Intel i7, 16GB RAM
-
-| Algorithm | Throughput | P50 Latency | P99 Latency |
-|-----------|------------|-------------|-------------|
-| Token Bucket | 140,000 req/s | 450µs | 850µs |
-| Leaky Bucket | 136,000 req/s | 500µs | 900µs |
-| Fixed Window | **172,000 req/s** | 300µs | **500µs** |
-| Sliding Window | 75,000 req/s | 800µs | 1.4ms |
-
-### Run Benchmarks
-```bash
-# Criterion benchmarks
-cargo bench
-
-# Load tests
-cargo test --release -- --nocapture
-
-# View HTML report
-open target/criterion/report/index.html
-```
-
-Full benchmark results: [results/BENCHMARKS.md](results/BENCHMARKS.md)
-
----
-
-## 💻 Usage Examples
-
-### Token Bucket (Recommended for Most APIs)
-```rust
-use distributed_rate_limiter::algorithms::TokenBucket;
-
-let config = RateLimitConfig::per_second(100);
-let mut limiter = TokenBucket::new(config);
-
-limiter.allow_request("user_123")?;
-```
-
-### Redis Distributed Mode
 ```rust
 use distributed_rate_limiter::redis_limiter::RedisRateLimiter;
+use distributed_rate_limiter::{RateLimitConfig, RateLimiter};
 
 let config = RateLimitConfig::per_second(1000);
 let mut limiter = RedisRateLimiter::new("redis://127.0.0.1/", config)?;
 
-// Works across multiple server instances
 limiter.allow_request("global_api_key")?;
 ```
 
-### With Metrics
+### With metrics
+
 ```rust
 use distributed_rate_limiter::metrics::{self, record_request};
+use std::time::Instant;
 
 metrics::init_metrics();
 
@@ -212,113 +141,84 @@ let start = Instant::now();
 let allowed = limiter.allow_request("user")?;
 record_request(allowed, start);
 
-// Get Prometheus metrics
+// Prometheus text format
 println!("{}", metrics::get_metrics());
 ```
 
 ---
 
-## 🧪 Testing
+## Benchmarks
+
+This repo does **not** publish benchmark numbers yet. A reproducible benchmark
+that measures accuracy as well as throughput is planned for Phase 2 of the
+[roadmap](docs/ROADMAP.md).
+
+You can measure on your own machine:
+
 ```bash
-# Unit tests
-cargo test
-
-# Integration tests
-cargo test --test '*'
-
-# Benchmarks
+# Criterion micro-benchmarks (HTML report in target/criterion/report/index.html)
 cargo bench
 
-# Load tests
-cargo test --release -- --nocapture load_test
+# Load tests, printing the throughput measured on this machine
+cargo test --release --test load_test -- --nocapture
 ```
 
 ---
 
-## 📚 Documentation
+## Testing
 
-- [Algorithm Comparison](web/comparison.html) - Interactive comparison page
-- [Benchmark Results](results/BENCHMARKS.md) - Detailed performance data
-- [Demo Guide](docs/demo.md) - Step-by-step demo instructions
-- [API Documentation](https://docs.rs/distributed-rate-limiter) - Rust docs
+```bash
+cargo test                          # unit + integration tests
+cargo clippy --all-targets -- -D warnings
+cargo fmt -- --check
+```
 
----
-
-## 🎯 Use Cases
-
-### Real-World Applications
-
-- **API Rate Limiting** - Prevent abuse, ensure fair usage (Stripe, GitHub)
-- **DDoS Protection** - Block excessive requests from single sources
-- **Resource Management** - Limit concurrent operations (database connections)
-- **MLOps Pipelines** - Rate limit model inference requests (OpenAI API)
-- **Microservices** - Control inter-service communication rates
-
-### Who Uses Rate Limiting?
-
-- 🔵 **Twitter**: 300 requests per 15-minute window
-- 🟢 **GitHub**: 5,000 requests per hour
-- 🔴 **Stripe**: Rate limits per API key
-- 🟡 **OpenAI**: Token-based rate limiting
+The Redis test passes without a running Redis server: it skips itself when it
+cannot connect.
 
 ---
 
-## 🛠️ Tech Stack
+## Roadmap
 
-- **Rust** - Systems programming, memory safety
-- **Redis** - Distributed coordination
-- **Prometheus** - Metrics and monitoring
-- **Actix-web** - HTTP server
-- **Tailwind CSS** - Modern UI styling
-- **Chart.js** - Data visualization
+These features are **not built yet**:
+
+- **Multi-tier limits:** per user, IP, endpoint and global limits combined
+- **Circuit breaker:** real open/half-open/closed states around the Redis backend
+- **WebSocket support:** live dashboard updates
+- **Server uses Redis:** the dashboard/server backed by the distributed limiter
+
+The full phase plan is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 
-## 🤝 Contributing
+## Tech Stack
 
-Contributions welcome! This project demonstrates distributed systems concepts and production-ready infrastructure patterns.
+- **Rust**: library, demo binary and web server
+- **Redis**: distributed prototype (Lua scripting)
+- **Prometheus** (`prometheus` crate): metrics
+- **Actix-web**: HTTP server
+- **Tailwind CSS** and **Chart.js** (via CDN): dashboard UI
+
+---
+
+## Contributing
 
 1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing`)
-5. Open Pull Request
+2. Create a feature branch (`git checkout -b feature/my-change`)
+3. Make sure `cargo test`, `cargo clippy --all-targets -- -D warnings` and `cargo fmt -- --check` pass
+4. Open a pull request
 
 ---
 
-## 📄 License
+## License
 
-MIT License - see [LICENSE](LICENSE) file for details
+MIT License. See [LICENSE](LICENSE).
 
 ---
 
-## 👨‍💻 Author
+## Author
 
 **Akchhya Singh**
 
-- GitHub: [@Akchhya1108](https://github.com/Akchhya1108)
+- GitHub: [@azzs11](https://github.com/azzs11)
 - LinkedIn: [akchhya-singh11](https://linkedin.com/in/akchhya-singh11)
-- Email: akchhya1108@gmail.com
-
----
-
-## ⭐ Show Your Support
-
-Give a ⭐️ if this project helped you!
-
----
-
-## 🙏 Acknowledgments
-
-- Inspired by production rate limiters at Cloudflare, Kong, and AWS
-- Thanks to the Rust community for amazing tools and libraries
-
----
-
-<div align="center">
-
-**Built with ❤️ in Rust**
-
-[⬆ Back to Top](#-distributed-rate-limiter)
-
-</div>
