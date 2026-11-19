@@ -9,7 +9,7 @@ cargo run --bin web-server
 
 ### 2. Open Dashboard
 
-Navigate to: http://localhost:3000
+Navigate to: http://localhost:3001
 
 ---
 
@@ -26,11 +26,11 @@ Navigate to: http://localhost:3000
 
 ### Scenario 2: Algorithm Comparison
 
-**Goal**: Compare Fixed Window (fastest) vs Sliding Window (most accurate)
+**Goal**: Compare Fixed Window (simple counter) vs Sliding Window (exact timestamps)
 
-1. Test with **Fixed Window**: Note the throughput
-2. Test with **Sliding Window**: Note the throughput
-3. **Result**: Fixed Window ~2x faster
+1. Test with **Fixed Window**: note the allowed/blocked counts and the throughput the dashboard reports
+2. Test with **Sliding Window** with the same settings
+3. **Result**: compare the numbers your run produced. They depend on your machine, so this guide does not quote any.
 
 ### Scenario 3: Burst Handling
 
@@ -39,27 +39,16 @@ Navigate to: http://localhost:3000
 1. Algorithm: **Token Bucket**
 2. Max Requests: **50**, Window: **1 second**
 3. Test Requests: **100**
-4. **Result**: ~50 allowed, showing burst capability
+4. **Result**: roughly the bucket's capacity is allowed in one burst, the rest blocked
 
-### Scenario 4: High Load
+### Scenario 4: Repeated Runs
 
-**Goal**: Demonstrate performance under load
+**Goal**: See how the measured duration varies between runs
 
 1. Max Requests: **100**
 2. Test Requests: **200**
 3. Run multiple times
-4. **Result**: Consistent sub-millisecond latency
-
----
-
-## 📊 Expected Results
-
-| Algorithm | Throughput | Best Use Case |
-|-----------|------------|---------------|
-| Token Bucket | ~140K/s | General APIs |
-| Leaky Bucket | ~136K/s | Streaming |
-| Fixed Window | ~172K/s | High traffic |
-| Sliding Window | ~75K/s | Precision |
+4. **Result**: compare the duration and throughput the dashboard reports for each run
 
 ---
 
