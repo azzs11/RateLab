@@ -1,6 +1,6 @@
 use crate::{RateLimitConfig, RateLimiter, Result};
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 #[derive(Debug)]
 struct WindowState {
@@ -66,6 +66,7 @@ impl RateLimiter for FixedWindow {
 mod tests {
     use super::*;
     use std::thread::sleep;
+    use std::time::Duration;
 
     #[test]
     fn test_fixed_window_allows_requests() {

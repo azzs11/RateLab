@@ -1,7 +1,6 @@
 use distributed_rate_limiter::algorithms::*;
 use distributed_rate_limiter::{RateLimitConfig, RateLimiter};
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 #[test]
 fn load_test_token_bucket() {

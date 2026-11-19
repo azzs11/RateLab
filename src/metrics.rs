@@ -1,5 +1,5 @@
 use lazy_static::lazy_static;
-use prometheus::{Counter, Encoder, Histogram, IntCounter, Registry, TextEncoder};
+use prometheus::{Encoder, Histogram, IntCounter, Registry, TextEncoder};
 use std::time::Instant;
 
 lazy_static! {

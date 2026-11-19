@@ -1,7 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use distributed_rate_limiter::algorithms::*;
 use distributed_rate_limiter::{RateLimitConfig, RateLimiter};
-use std::time::Duration;
 
 fn benchmark_token_bucket(c: &mut Criterion) {
     let mut group = c.benchmark_group("token_bucket");

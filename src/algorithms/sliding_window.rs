@@ -1,6 +1,6 @@
 use crate::{RateLimitConfig, RateLimiter, Result};
 use std::collections::{HashMap, VecDeque};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 #[derive(Debug)]
 struct RequestLog {
@@ -64,6 +64,7 @@ impl RateLimiter for SlidingWindow {
 mod tests {
     use super::*;
     use std::thread::sleep;
+    use std::time::Duration;
 
     #[test]
     fn test_sliding_window_allows_requests() {

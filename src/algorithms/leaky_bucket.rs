@@ -12,7 +12,6 @@ struct BucketState {
 /// Water (requests) fills a bucket that leaks at a constant rate
 /// If bucket overflows, requests are denied
 pub struct LeakyBucket {
-    config: RateLimitConfig,
     buckets: HashMap<String, BucketState>,
     leak_rate: f64, // water units leaked per second
     max_capacity: f64,
@@ -24,7 +23,6 @@ impl LeakyBucket {
         let max_capacity = config.max_requests as f64;
 
         Self {
-            config,
             buckets: HashMap::new(),
             leak_rate,
             max_capacity,

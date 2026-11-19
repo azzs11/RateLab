@@ -2,12 +2,11 @@ use actix_cors::Cors;
 use actix_files as fs;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Result};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use distributed_rate_limiter::algorithms::*;
 use distributed_rate_limiter::metrics;
-use distributed_rate_limiter::{AlgorithmType, RateLimitConfig, RateLimiter};
+use distributed_rate_limiter::{RateLimitConfig, RateLimiter};
 
 #[derive(Serialize)]
 struct MetricsResponse {
