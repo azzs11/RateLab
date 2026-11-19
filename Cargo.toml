@@ -2,6 +2,9 @@
 name = "distributed-rate-limiter"
 version = "0.6.0"
 edition = "2021"
+description = "Rate limiting algorithms in Rust (token bucket, leaky bucket, fixed and sliding window) with a Redis-backed prototype."
+license = "MIT"
+repository = "https://github.com/azzs11/distributed-rate-limiter"
 
 [dependencies]
 tokio = { version = "1.35", features = ["full"] }
