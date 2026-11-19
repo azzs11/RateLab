@@ -1,6 +1,6 @@
 pub mod algorithms;
+pub mod metrics;
 pub mod redis_limiter;
-pub mod metrics; 
 
 use std::time::Duration;
 use thiserror::Error;
@@ -9,7 +9,7 @@ use thiserror::Error;
 pub enum RateLimitError {
     #[error("Rate limit exceeded")]
     LimitExceeded,
-    
+
     #[error("Configuration error: {0}")]
     ConfigError(String),
 }
@@ -30,11 +30,11 @@ impl RateLimitConfig {
             window,
         }
     }
-    
+
     pub fn per_second(max_requests: u64) -> Self {
         Self::new(max_requests, Duration::from_secs(1))
     }
-    
+
     pub fn per_minute(max_requests: u64) -> Self {
         Self::new(max_requests, Duration::from_secs(60))
     }
@@ -44,7 +44,7 @@ impl RateLimitConfig {
 pub trait RateLimiter: Send + Sync {
     /// Check if a request is allowed
     fn allow_request(&mut self, key: &str) -> Result<bool>;
-    
+
     /// Reset the rate limiter for a specific key
     fn reset(&mut self, key: &str);
 }

@@ -1,13 +1,13 @@
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Result};
 use actix_cors::Cors;
 use actix_files as fs;
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use distributed_rate_limiter::{RateLimiter, RateLimitConfig, AlgorithmType};
 use distributed_rate_limiter::algorithms::*;
 use distributed_rate_limiter::metrics;
+use distributed_rate_limiter::{AlgorithmType, RateLimitConfig, RateLimiter};
 
 #[derive(Serialize)]
 struct MetricsResponse {
@@ -44,13 +44,13 @@ async fn get_metrics() -> Result<HttpResponse> {
     let total = metrics::REQUESTS_TOTAL.get();
     let allowed = metrics::REQUESTS_ALLOWED.get();
     let blocked = metrics::REQUESTS_BLOCKED.get();
-    
+
     let allow_rate = if total > 0 {
         (allowed as f64 / total as f64) * 100.0
     } else {
         0.0
     };
-    
+
     Ok(HttpResponse::Ok().json(MetricsResponse {
         total,
         allowed,
@@ -65,12 +65,12 @@ async fn test_rate_limiter(req: web::Json<TestRequest>) -> Result<HttpResponse> 
         req.max_requests,
         std::time::Duration::from_secs(req.window_seconds),
     );
-    
+
     let start = Instant::now();
     let mut allowed_count = 0;
     let mut blocked_count = 0;
     let mut results = Vec::new();
-    
+
     match req.algorithm.as_str() {
         "token_bucket" => {
             let mut limiter = TokenBucket::new(config);
@@ -150,11 +150,11 @@ async fn test_rate_limiter(req: web::Json<TestRequest>) -> Result<HttpResponse> 
         }
         _ => {}
     }
-    
+
     let duration = start.elapsed();
     let duration_ms = duration.as_secs_f64() * 1000.0;
     let requests_per_sec = req.num_requests as f64 / duration.as_secs_f64();
-    
+
     Ok(HttpResponse::Ok().json(TestResponse {
         allowed: allowed_count,
         blocked: blocked_count,
@@ -168,15 +168,15 @@ async fn test_rate_limiter(req: web::Json<TestRequest>) -> Result<HttpResponse> 
 async fn main() -> std::io::Result<()> {
     // Initialize metrics
     metrics::init_metrics();
-    
+
     println!("🚀 Starting Rate Limiter Web Dashboard");
     println!("📊 Dashboard: http://localhost:3001");
     println!("📈 Metrics API: http://localhost:3001/api/metrics");
     println!("\nPress Ctrl+C to stop\n");
-    
+
     HttpServer::new(|| {
         let cors = Cors::permissive();
-        
+
         App::new()
             .wrap(cors)
             .service(index)

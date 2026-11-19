@@ -1,4 +1,4 @@
-use crate::{RateLimiter, RateLimitConfig, Result};
+use crate::{RateLimitConfig, RateLimiter, Result};
 use redis::{Client, Commands, Script};
 use std::time::SystemTime;
 
@@ -13,7 +13,7 @@ impl RedisRateLimiter {
     /// Create a new Redis rate limiter
     pub fn new(redis_url: &str, config: RateLimitConfig) -> anyhow::Result<Self> {
         let client = Client::open(redis_url)?;
-        
+
         // Lua script for atomic token bucket check
         // This ensures race conditions don't occur in distributed systems
         let lua_script = Script::new(
@@ -47,14 +47,14 @@ impl RedisRateLimiter {
             return allowed
             "#,
         );
-        
+
         Ok(Self {
             client,
             config,
             lua_script,
         })
     }
-    
+
     /// Check with circuit breaker pattern
     pub fn check_with_fallback(&mut self, key: &str) -> Result<bool> {
         match self.allow_request(key) {
@@ -70,9 +70,10 @@ impl RedisRateLimiter {
 
 impl RateLimiter for RedisRateLimiter {
     fn allow_request(&mut self, key: &str) -> Result<bool> {
-        let mut conn = self.client.get_connection()
-            .map_err(|e| crate::RateLimitError::ConfigError(format!("Redis connection failed: {}", e)))?;
-        
+        let mut conn = self.client.get_connection().map_err(|e| {
+            crate::RateLimitError::ConfigError(format!("Redis connection failed: {}", e))
+        })?;
+
         let redis_key = format!("rate_limit:{}", key);
         let max_tokens = self.config.max_requests as f64;
         let refill_rate = max_tokens / self.config.window.as_secs_f64();
@@ -81,8 +82,9 @@ impl RateLimiter for RedisRateLimiter {
             .unwrap()
             .as_secs_f64();
         let ttl = (self.config.window.as_secs() * 2) as usize;
-        
-        let allowed: i32 = self.lua_script
+
+        let allowed: i32 = self
+            .lua_script
             .key(&redis_key)
             .arg(max_tokens)
             .arg(refill_rate)
@@ -90,18 +92,15 @@ impl RateLimiter for RedisRateLimiter {
             .arg(ttl)
             .invoke(&mut conn)
             .map_err(|e| crate::RateLimitError::ConfigError(format!("Lua script failed: {}", e)))?;
-        
+
         Ok(allowed == 1)
     }
-    
+
     fn reset(&mut self, key: &str) {
         if let Ok(mut conn) = self.client.get_connection() {
             let redis_key = format!("rate_limit:{}", key);
             let res: redis::RedisResult<i32> = conn.del(&redis_key);
             let _ = res;
-
-
-
         }
     }
 }
@@ -109,29 +108,29 @@ impl RateLimiter for RedisRateLimiter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_redis_rate_limiter() {
         // Skip if Redis not available
         let config = RateLimitConfig::per_second(5);
-        
+
         match RedisRateLimiter::new("redis://127.0.0.1/", config) {
             Ok(mut limiter) => {
                 // Clean slate
                 limiter.reset("test_user");
-                
+
                 // Should allow 5 requests
                 for _ in 0..5 {
                     if let Ok(allowed) = limiter.allow_request("test_user") {
                         assert!(allowed);
                     }
                 }
-                
+
                 // 6th should be denied
                 if let Ok(allowed) = limiter.allow_request("test_user") {
                     assert!(!allowed);
                 }
-                
+
                 // Cleanup
                 limiter.reset("test_user");
             }
