@@ -28,11 +28,13 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
 pub mod algorithms;
+pub mod breaker;
 pub mod clock;
 pub mod decision;
 pub mod units;
 
 pub use algorithms::{Algorithm, FixedWindow, Gcra, LeakyBucket, SlidingWindow, TokenBucket};
+pub use breaker::{BreakerConfig, BreakerState, CircuitBreaker, FailurePolicy};
 #[cfg(feature = "std-clock")]
 pub use clock::MonotonicClock;
 pub use clock::{Clock, ManualClock};
