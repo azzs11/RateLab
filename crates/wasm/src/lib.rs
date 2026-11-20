@@ -1,4 +1,13 @@
-//! WebAssembly bindings for `drl-core`, used by the browser playground.
+//! WebAssembly bindings for `drl-core` and `sim`, used by the browser playground.
+//!
+//! - [`Limiter`]: one live limiter, time passed in from JavaScript;
+//! - [`traffic::Traffic`]: seeded traffic patterns, or arrays from a user's log;
+//! - [`lab::LabRun`]: one algorithm over some traffic, with its state over time;
+//! - [`cluster::ClusterView`]: the multi-node simulator with any strategy;
+//! - [`replay::ReplayReport`]: a log replayed through everything, plus a limit
+//!   recommendation.
+//!
+//! Everything is the same Rust code the library, the tests and RESULTS.md use.
 //!
 //! The browser has no system clock that `wasm32-unknown-unknown` can read, so every
 //! call takes the current time from JavaScript (`performance.now()` in milliseconds).
@@ -14,6 +23,11 @@
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
+
+pub mod cluster;
+pub mod lab;
+pub mod replay;
+pub mod traffic;
 
 use drl_core::{Algorithm, Cost, ManualClock, Nanos, RateLimitConfig, RateLimiter};
 use std::sync::Arc;

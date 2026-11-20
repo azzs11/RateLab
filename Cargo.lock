@@ -3145,6 +3145,7 @@ name = "wasm"
 version = "0.6.0"
 dependencies = [
  "drl-core",
+ "sim",
  "wasm-bindgen",
 ]
 
