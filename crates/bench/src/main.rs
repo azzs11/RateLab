@@ -2,6 +2,7 @@
 //!
 //! - `local`: in-process accuracy, latency, throughput and fairness → `results/local.json`
 //! - `report`: `results/*.json` → `results/RESULTS.md` and the README's results table
+//! - `machine`: print this machine's description
 //!
 //! Memory per key is a separate binary (`--bin memory`), and the 3-node run is the
 //! `loadgen` binary inside Docker Compose. `just results` runs all of them.
@@ -42,12 +43,19 @@ enum Command {
         #[arg(long, default_value = "README.md")]
         readme: PathBuf,
     },
+    /// Print this machine's description (used to label the Docker run).
+    Machine,
 }
 
 fn main() -> anyhow::Result<()> {
     match Cli::parse().command {
         Command::Local { quick, out } => run_local(quick, &out),
         Command::Report { dir, readme } => run_report(&dir, &readme),
+        Command::Machine => {
+            let m = Machine::detect();
+            println!("{} · commit `{}`", m.one_line(), m.git_commit);
+            Ok(())
+        }
     }
 }
 
@@ -97,6 +105,7 @@ fn run_report(dir: &std::path::Path, readme: &std::path::Path) -> anyhow::Result
     let inputs = Inputs {
         local: read_json(&dir.join("local.json"))?,
         memory: read_json(&dir.join("memory.json"))?,
+        cluster: read_json(&dir.join("cluster.json"))?,
     };
     let results_path = dir.join("RESULTS.md");
     std::fs::write(&results_path, report::results_md(&inputs))

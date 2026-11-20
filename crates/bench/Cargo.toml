@@ -14,9 +14,12 @@ drl-core = { workspace = true, features = ["std-clock"] }
 sim = { path = "../sim" }
 anyhow = "1.0"
 cap = "0.1"
-clap = { version = "4.6", features = ["derive"] }
+clap = { version = "4.6", features = ["derive", "env"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+redis = { version = "1.8", default-features = false, features = ["tokio-comp"] }
+reqwest = { version = "0.13", default-features = false }
+tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "time", "sync"] }
 
 [dev-dependencies]
 criterion = { version = "0.8", features = ["html_reports"] }

@@ -3,6 +3,7 @@
 //! Nothing here measures anything: every number printed comes from a result file, and
 //! each section names the machine and commit it was measured on.
 
+use crate::cluster::ClusterResults;
 use crate::local::{ACCURACY_KEYS, ACCURACY_LIMIT, Scenario, TENANTS};
 use crate::machine::Machine;
 use crate::results::{LocalResults, MemoryResults};
@@ -21,6 +22,8 @@ pub struct Inputs {
     pub local: Option<LocalResults>,
     /// `memory.json`.
     pub memory: Option<MemoryResults>,
+    /// `cluster.json`.
+    pub cluster: Option<ClusterResults>,
 }
 
 /// `mean (min–max)` with `d` decimals, or just the mean when there is no spread.
@@ -69,9 +72,16 @@ pub fn results_md(inputs: &Inputs) -> String {
     if let Some(m) = &inputs.memory {
         md.push_str(&machine_line("Memory", &m.machine));
     }
+    if let Some(c) = &inputs.cluster {
+        md.push_str(&machine_line("Cluster (inside the containers)", &c.machine));
+        if let Some(host) = &c.host {
+            let _ = writeln!(md, "- **Cluster host:** {host}");
+        }
+    }
     let missing: Vec<&str> = [
         ("local.json", inputs.local.is_none()),
         ("memory.json", inputs.memory.is_none()),
+        ("cluster.json", inputs.cluster.is_none()),
     ]
     .iter()
     .filter(|(_, missing)| *missing)
@@ -87,6 +97,9 @@ pub fn results_md(inputs: &Inputs) -> String {
     }
     if let Some(m) = &inputs.memory {
         memory_section(&mut md, m);
+    }
+    if let Some(c) = &inputs.cluster {
+        cluster_section(&mut md, c);
     }
 
     md.push_str("## Reproduce\n\n```bash\njust results\n```\n\n");
@@ -245,6 +258,116 @@ fn memory_section(md: &mut String, m: &MemoryResults) {
     md.push('\n');
 }
 
+fn cluster_section(md: &mut String, c: &ClusterResults) {
+    let _ = write!(
+        md,
+        "## {} nodes sharing one Redis (Docker Compose)\n\n\
+         Each node runs the Axum server with the Redis token bucket. The load generator sends \
+         open-loop Poisson traffic at {:.1}× the limit to {} keys (limit {} per {} s per key), \
+         {} s per run, {} seeds, and records every request's send time. **vs one bucket** \
+         compares with a single in-process token bucket fed the same send times: what a \
+         perfectly coordinated cluster would decide. **vs oracle** compares with the exact \
+         rule, as in the in-process tables. Redis counters come from Redis itself (`INFO`).\n\n",
+        c.nodes, c.load_factor, c.keys, c.limit, c.window_secs, c.run_secs, c.seeds
+    );
+    md.push_str(
+        "| Scenario | Node 0 share % | Sent/s | Over vs one bucket % | Under vs one bucket % | \
+         Over vs oracle % | Worst window × limit |\n|---|---:|---:|---:|---:|---:|---:|\n",
+    );
+    for r in &c.scenarios {
+        let _ = writeln!(
+            md,
+            "| {} | {:.0} | {} | {} | {} | {} | {} |",
+            r.scenario,
+            r.node0_share_pct,
+            spread(&r.sent_per_sec, 0),
+            spread(&r.over_vs_single_pct, 2),
+            spread(&r.under_vs_single_pct, 2),
+            spread(&r.over_vs_oracle_pct, 2),
+            spread(&r.worst_window_ratio, 2)
+        );
+    }
+    md.push_str(
+        "\n| Scenario | Redis calls / 1k decisions | Redis commands / 1k | Redis bytes / decision | \
+         p50 ms | p99 ms | p99.9 ms | No response % |\n|---|---:|---:|---:|---:|---:|---:|---:|\n",
+    );
+    for r in &c.scenarios {
+        let _ = writeln!(
+            md,
+            "| {} | {} | {} | {} | {} | {} | {} | {} |",
+            r.scenario,
+            spread(&r.redis_calls_per_1k, 0),
+            spread(&r.redis_commands_per_1k, 0),
+            spread(&r.redis_bytes_per_decision, 0),
+            spread(&r.p50_ms, 2),
+            spread(&r.p99_ms, 2),
+            spread(&r.p999_ms, 2),
+            spread(&r.no_response_pct, 2)
+        );
+    }
+    md.push_str(
+        "\nLatency is measured at the load generator and includes Docker networking. Redis \
+         commands include the 4 commands inside the Lua script (TIME, HMGET, HSET, PEXPIRE).\n\n",
+    );
+    if let Some(t) = &c.throughput {
+        let _ = write!(
+            md,
+            "### Closed-loop throughput\n\n\
+             {} requests in flight, spread over the nodes and about a million keys, {} s per run, \
+             {} runs after a warm-up.\n\n\
+             | Requests/s | p50 ms | p99 ms |\n|---:|---:|---:|\n| {} | {} | {} |\n\n",
+            t.concurrency,
+            t.secs,
+            t.requests_per_sec.n,
+            spread(&t.requests_per_sec, 0),
+            spread(&t.p50_ms, 2),
+            spread(&t.p99_ms, 2)
+        );
+    }
+    if !c.resilience.is_empty() {
+        let _ = write!(
+            md,
+            "### Redis outage\n\n\
+             Redis stops running scripts from {:.0} s to {:.0} s (`CLIENT PAUSE ... WRITE`) while \
+             traffic continues on both routes. `/api/hello` fails **open**, `/api/orders` fails \
+             **closed**.{}{}\n\n\
+             | Phase | Route (policy) | Requests | Allowed % | Over vs oracle % | Redis % | Breaker open % | Redis error % | No response % | p99 ms |\n\
+             |---|---|---:|---:|---:|---:|---:|---:|---:|---:|\n",
+            c.outage_secs.0,
+            c.outage_secs.1,
+            c.breaker.map_or_else(String::new, |b| format!(
+                " Each node's breaker opens after {} consecutive failures and probes again after \
+                 {} ms; Redis calls time out after {} ms.",
+                b.failures, b.open_ms, b.redis_timeout_ms
+            )),
+            c.recovery_ms.map_or_else(
+                || " Not every node had recovered by the end of the run.".to_owned(),
+                |ms| format!(
+                    " Every node was answering from Redis again {ms:.0} ms after Redis recovered."
+                )
+            )
+        );
+        for r in &c.resilience {
+            let _ = writeln!(
+                md,
+                "| {} | {} ({}) | {} | {:.1} | {:.1} | {:.1} | {:.1} | {:.1} | {:.1} | {:.1} |",
+                r.phase,
+                r.route,
+                r.failure_policy,
+                r.requests,
+                r.allowed_pct,
+                r.over_vs_oracle_pct,
+                r.redis_pct,
+                r.breaker_open_pct,
+                r.redis_error_pct,
+                r.no_response_pct,
+                r.p99_ms
+            );
+        }
+        md.push('\n');
+    }
+}
+
 /// The short table embedded in the README.
 pub fn readme_block(inputs: &Inputs) -> String {
     let mut md = String::new();
@@ -307,6 +430,24 @@ pub fn readme_block(inputs: &Inputs) -> String {
         );
     }
     md.push('\n');
+    if let Some(c) = &inputs.cluster
+        && let Some(uniform) = c.scenarios.iter().find(|r| r.scenario == "uniform")
+    {
+        let _ = writeln!(
+            md,
+            "**{} nodes sharing Redis** (Docker Compose on the same machine): over-admission \
+             {:.2}% compared with one perfectly coordinated token bucket, {:.0} Redis calls per \
+             1,000 decisions, p99 {:.2} ms at the client{}.\n",
+            c.nodes,
+            uniform.over_vs_single_pct.mean,
+            uniform.redis_calls_per_1k.mean,
+            uniform.p99_ms.mean,
+            c.throughput.as_ref().map_or_else(String::new, |t| format!(
+                ", {:.0} requests/s closed-loop",
+                t.requests_per_sec.mean
+            ))
+        );
+    }
     md.push_str(README_END);
     md
 }
@@ -349,7 +490,7 @@ mod tests {
     #[test]
     fn empty_inputs_say_nothing_was_measured() {
         let md = results_md(&Inputs::default());
-        assert!(md.contains("Not measured yet: local.json, memory.json"));
+        assert!(md.contains("Not measured yet: local.json, memory.json, cluster.json"));
         assert!(readme_block(&Inputs::default()).contains("No results yet"));
     }
 }

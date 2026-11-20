@@ -5,11 +5,13 @@
 //! - [`local`]: in-process accuracy against the exact [`oracle`], latency,
 //!   throughput and fairness;
 //! - [`memory`]: bytes per key (the `memory` binary);
+//! - [`cluster`]: the 3-node Docker run against Redis (the `loadgen` binary);
 //! - [`report`]: turns `results/*.json` into RESULTS.md and the README table, with the
 //!   [`machine`] each file was measured on.
 
 #![forbid(unsafe_code)]
 
+pub mod cluster;
 pub mod local;
 pub mod machine;
 pub mod memory;
