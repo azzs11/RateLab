@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/License-MIT-blue)
 ![Stars](https://img.shields.io/github/stars/azzs11/distributed-rate-limiter?style=social)
 
-**Rate limiting algorithms in Rust (token bucket, leaky bucket, fixed and sliding window, GCRA) with a Redis-backed prototype.**
+**Rate limiting algorithms in Rust (token bucket, leaky bucket, fixed and sliding window, GCRA), shared across nodes through Redis, with a benchmark that reproduces every number below.**
 
 [Features](#features) • [Quick Start](#quick-start) • [Benchmarks](#benchmarks) • [Roadmap](#roadmap)
 
@@ -17,8 +17,10 @@
 ## Overview
 
 Five rate limiting algorithms behind one `RateLimiter` trait, with thread-safe
-state and injected time, plus Prometheus metrics, a small Actix web dashboard for
-trying the algorithms interactively, and a Redis-backed token bucket prototype.
+state and injected time; a Redis store that several nodes share, behind a circuit
+breaker; an Axum server whose Tower layer sends IETF `RateLimit` headers; and a
+benchmark that measures accuracy against an exact oracle, on one machine and on a
+3-node Docker cluster.
 
 The project is being reworked into a rate limiter that **measures and reports
 its own accuracy**. See [docs/ROADMAP.md](docs/ROADMAP.md) for the plan.
@@ -51,25 +53,54 @@ How they behave:
   (`crates/core/tests/conformance.rs`), including an exact `retry_after` and a
   multi-threaded no-over-admission check.
 
-### Redis prototype
+### Shared through Redis (`drl-redis-store`)
 
-`RedisRateLimiter` (`crates/redis-store`) runs a token bucket as an atomic
-Lua script in Redis, so several processes could share one limit. It is a
-**prototype**:
+`RedisRateLimiter` keeps a token bucket per key in Redis, so every node that talks
+to the same Redis enforces one shared limit.
 
-- The web server does **not** use it yet. The dashboard only runs the
-  in-process algorithms.
-- It opens a new Redis connection on every request.
-- It uses the application server's clock, not Redis `TIME`.
-- `check_with_fallback` fails open (allows the request) when Redis is
-  unreachable. That is a fallback, not a circuit breaker.
+- **One multiplexed connection** per limiter, reconnecting automatically.
+- **EVALSHA:** the Lua script ([`scripts/token_bucket.lua`](crates/redis-store/scripts/token_bucket.lua))
+  is sent by hash; the full script only goes over the wire again after `NOSCRIPT`.
+- **Redis `TIME`:** the script reads Redis's clock, not the application server's,
+  so nodes with skewed clocks still agree.
+- **Exact integers:** token amounts are scaled by the window in microseconds and
+  kept below 2^53, so Lua's doubles never round.
+- **Circuit breaker:** `GuardedLimiter` wraps the store in a closed / open /
+  half-open breaker (`drl_core::CircuitBreaker`). While Redis is down, each
+  call's `FailurePolicy` decides: **fail open** (allow) or **fail closed** (deny).
+- **Tested against a real Redis** started by testcontainers, including an outage.
+
+### HTTP server (`crates/server`)
+
+An Axum app with a Tower `RateLimitLayer` on real routes:
+
+| Route | Policy | When Redis is down |
+|-------|--------|--------------------|
+| `GET /api/hello` | `public` | fails open |
+| `POST /api/orders` | `orders` | fails closed |
+| `GET /health`, `GET /metrics` | not limited | |
+
+Every limited response carries the IETF draft headers
+([draft-ietf-httpapi-ratelimit-headers](https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/)):
+
+```text
+RateLimit-Policy: "public";q=100;w=1
+RateLimit: "public";r=99;t=1
+Retry-After: 1                       (on 429 only)
+x-drl-source: redis                  (local | redis | breaker_open | redis_error)
+```
+
+Callers are identified by the `x-api-key` header, else their IP. Time values are
+rounded **up** to whole seconds, so a client that waits `Retry-After` never retries
+too early. `/metrics` exports Prometheus counters and a decision-time histogram
+(through the `metrics` crate).
 
 ### Other
 
-- **Prometheus metrics:** request counters and a latency histogram (`crates/server/src/metrics.rs`)
 - **Web dashboard:** run a burst of requests against any algorithm and see allowed/blocked results
-- **Simulator** (`crates/sim`): seeded, deterministic traffic (jittered, bursty, the
-  fixed-window boundary attack) replayed through any limiter
+- **Simulator** (`crates/sim`): seeded, deterministic traffic (steady Poisson, on/off,
+  heavy-tailed Pareto, diurnal ramp, flash crowd, the fixed-window boundary attack)
+  replayed through any limiter, identical on every platform
 - **WebAssembly bindings** (`crates/wasm`): the same algorithms, compiled for the
   browser, for the upcoming playground
 
@@ -77,12 +108,13 @@ Lua script in Redis, so several processes could share one limit. It is a
 
 | Crate | What it holds |
 |-------|---------------|
-| `crates/core` (`drl-core`) | Algorithms, `Clock`, `Decision`, unit newtypes. No I/O. |
-| `crates/redis-store` (`drl-redis-store`) | Redis-backed token bucket prototype |
-| `crates/server` | Actix web dashboard (`web-server`) and demo binary (`demo`) |
-| `crates/sim` | Deterministic traffic simulation |
+| `crates/core` (`drl-core`) | Algorithms, `Clock`, `Decision`, circuit breaker, unit newtypes. No I/O. |
+| `crates/redis-store` (`drl-redis-store`) | Redis token bucket (Lua, EVALSHA, Redis `TIME`) and `GuardedLimiter` |
+| `crates/server` | Axum server with the Tower layer and dashboard (`web-server`), demo binary (`demo`) |
+| `crates/sim` | Deterministic traffic scenarios |
 | `crates/wasm` | wasm-bindgen wrapper for the browser |
-| `crates/bench` | Criterion benchmarks and measurement scenarios |
+| `crates/bench` | Exact oracle, measurement suite, load generator, RESULTS.md writer, Criterion benches |
+| `deploy/` | Dockerfile and Docker Compose: 3 nodes, Redis, load generator |
 
 ---
 
@@ -108,6 +140,9 @@ cargo run -p server --bin web-server
 # then open http://localhost:3001
 ```
 
+The dashboard runs bursts against a fresh in-process limiter; the limited routes
+above use the server's configured backend.
+
 ---
 
 ## Quick Start
@@ -115,7 +150,8 @@ cargo run -p server --bin web-server
 ### Prerequisites
 
 - Rust 1.89 or newer via [rustup](https://rustup.rs/) (the minimum is checked in CI)
-- Redis (optional, only for the Redis prototype)
+- Docker (optional): for the Redis tests and the 3-node cluster
+- [just](https://github.com/casey/just) (optional): `cargo install just --locked`
 
 ### Installation
 
@@ -127,7 +163,7 @@ cargo build --release
 cargo test --workspace
 
 cargo run -p server --bin demo        # terminal demo of every algorithm
-cargo run -p server --bin web-server  # dashboard on http://localhost:3001
+cargo run -p server --bin web-server  # server and dashboard on http://localhost:3001
 ```
 
 ### Basic usage
@@ -166,36 +202,86 @@ clock.advance(denied.retry_after.unwrap()); // no sleeping
 assert!(limiter.check("k", Cost::ONE).allowed);
 ```
 
-### Redis prototype
+### Shared through Redis
 
 ```rust
-use drl_core::{Cost, RateLimitConfig};
-use drl_redis_store::RedisRateLimiter;
+use drl_core::{BreakerConfig, CircuitBreaker, Cost, FailurePolicy, MonotonicClock, RateLimitConfig};
+use drl_redis_store::{GuardedLimiter, RedisRateLimiter};
+use std::time::Duration;
 
 let config = RateLimitConfig::per_second(1000)?;
-let limiter = RedisRateLimiter::new("redis://127.0.0.1/", config)?;
+let store = RedisRateLimiter::connect("redis://127.0.0.1/", config).await?;
+let breaker = CircuitBreaker::new(BreakerConfig::new(5, Duration::from_secs(1))?, MonotonicClock::new());
+let limiter = GuardedLimiter::new(store, breaker);
 
-let decision = limiter.check("global_api_key", Cost::ONE)?;
+let checked = limiter.check("global_api_key", Cost::ONE, FailurePolicy::FailClosed).await;
+println!("allowed: {} (decided by {:?})", checked.decision.allowed, checked.source);
+```
+
+### Server with Redis
+
+```bash
+docker run --rm -p 6379:6379 redis:7.4-alpine
+cargo run -p server --bin web-server -- --backend redis --limit 100 --window-ms 1000
+
+curl -i -H 'x-api-key: alice' localhost:3001/api/hello
+```
+
+Every flag can also be set by environment variable (`DRL_BACKEND`, `DRL_LIMIT`, ...);
+`--help` lists them.
+
+### Three nodes in Docker
+
+```bash
+just cluster           # or see deploy/docker-compose.yml
 ```
 
 ---
 
 ## Benchmarks
 
-This repo does **not** publish benchmark numbers yet. A reproducible benchmark
-that measures accuracy as well as throughput is planned for Phase 2 of the
-[roadmap](docs/ROADMAP.md).
+<!-- results:start (generated by `just results`, do not edit) -->
 
-You can measure on your own machine:
+No results yet: run `just results`.
+
+<!-- results:end -->
+
+### Reproduce
 
 ```bash
-# Criterion micro-benchmarks (HTML report in target/criterion/report/index.html)
-cargo bench -p bench
-
-# Measurement scenarios, printing what this machine measures
-cargo run -p bench --release -- load
-cargo run -p bench --release -- latency
+just results
 ```
+
+One command runs everything and rewrites [results/RESULTS.md](results/RESULTS.md)
+and the table above:
+
+1. `cargo run -p bench --release -- local`: in-process accuracy, latency,
+   throughput and fairness (`results/local.json`);
+2. `cargo run -p bench --release --bin memory`: bytes per key (`results/memory.json`);
+3. `just cluster`: 3 nodes + Redis + load generator in Docker Compose
+   (`results/cluster.json`);
+4. `cargo run -p bench --release -- report`: the Markdown, from the JSON files only.
+
+**Method.**
+
+- **Accuracy:** measured against an exact oracle, a plain log per key that admits a
+  request only if the key stays within its limit in every window-long span. The
+  oracle shares no code with the library.
+- **Scenarios:** seeded, so accuracy numbers are reproducible bit for bit.
+- **Latency and throughput:** warmed up, then repeated; the tables show mean and
+  min–max.
+- **Machine:** every result file records the machine, OS, rustc and commit it was
+  measured on.
+
+**Limits of these numbers.**
+
+- **Cluster run:** the nodes, Redis and the load generator share one machine and
+  Docker's network, so the cluster numbers show the protocol's behaviour, not a
+  production deployment.
+- **Latency on macOS:** the clock ticks too coarsely to time one call, so latency is
+  timed in batches of calls (see RESULTS.md).
+
+Criterion micro-benchmarks for regression checks: `cargo bench -p bench`.
 
 ---
 
@@ -206,11 +292,12 @@ cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
 
-# Needs a Redis server on 127.0.0.1:6379 (CI runs this against a Redis container)
-cargo test -p drl-redis-store -- --ignored
+# Starts Redis containers with testcontainers (needs Docker; CI runs these on every push)
+cargo test --workspace -- --ignored
 ```
 
-No test sleeps: time-dependent tests drive a `ManualClock`.
+No test sleeps: time-dependent tests drive a `ManualClock`, and the Redis outage
+test pauses Redis with `CLIENT PAUSE` instead of waiting.
 
 ---
 
@@ -218,10 +305,10 @@ No test sleeps: time-dependent tests drive a `ManualClock`.
 
 These features are **not built yet**:
 
+- **Coordination strategies:** local split, async sync and adaptive quota leasing,
+  compared with Redis-per-call on the same benchmark (Phase 3)
 - **Multi-tier limits:** per user, IP, endpoint and global limits combined
-- **Circuit breaker:** real open/half-open/closed states around the Redis backend
 - **WebSocket support:** live dashboard updates
-- **Server uses Redis:** the dashboard/server backed by the distributed limiter
 
 The full phase plan is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -229,12 +316,13 @@ The full phase plan is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Tech Stack
 
-- **Rust** (2024 edition): library, demo binary and web server
+- **Rust** (2024 edition): library, server, benchmark
 - **DashMap**: thread-safe per-key state
-- **Redis**: distributed prototype (Lua scripting)
+- **Redis** (`redis` crate, Lua scripting): shared state across nodes
+- **Axum** and **Tower**: HTTP server and rate limit middleware
+- **metrics** with the Prometheus exporter: metrics
+- **testcontainers** and **Docker Compose**: real Redis in tests, 3-node cluster
 - **wasm-bindgen**: WebAssembly bindings
-- **Prometheus** (`prometheus` crate): metrics
-- **Actix-web**: HTTP server
 - **Tailwind CSS** and **Chart.js** (via CDN): dashboard UI
 
 ---
@@ -243,7 +331,7 @@ The full phase plan is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/my-change`)
-3. Make sure `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo fmt --all -- --check` pass
+3. Make sure `just test` passes (or `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo fmt --all -- --check`)
 4. Open a pull request
 
 ---

@@ -4,7 +4,7 @@
 
 ### 1. Start the Server
 ```bash
-cargo run --bin web-server
+cargo run -p server --bin web-server
 ```
 
 ### 2. Open Dashboard
