@@ -6,14 +6,7 @@ use std::time::Duration;
 use wasm_bindgen::prelude::*;
 
 /// Every pattern [`Traffic::generate`] accepts.
-pub const PATTERNS: [&str; 6] = [
-    "steady",
-    "bursty",
-    "heavy_tailed",
-    "diurnal",
-    "flash_crowd",
-    "boundary_attack",
-];
+pub use sim::patterns::PATTERNS;
 
 /// Requests over time: what a limiter or a cluster is fed.
 #[wasm_bindgen]
@@ -41,27 +34,6 @@ pub(crate) fn config(limit: u32, window_ms: f64) -> Result<RateLimitConfig, Stri
     .map_err(|e| e.to_string())
 }
 
-/// The fixed-window boundary attack repeated every two windows for `secs`: `limit`
-/// requests just before a window edge and `limit` more 2 ms after it.
-fn repeated_attack(config: RateLimitConfig, secs: f64) -> Vec<Arrival> {
-    let window = config.window_nanos();
-    let end = ms_to_nanos(secs * 1_000.0);
-    let gap = 2_000_000u64.min(window / 2);
-    let mut out = Vec::new();
-    let mut edge = window;
-    while edge < end {
-        for at in [edge.saturating_sub(gap / 2 + 1), edge + gap / 2] {
-            out.extend((0..config.limit()).map(|_| Arrival {
-                at: Nanos(at),
-                key: 0,
-                cost: Cost::ONE,
-            }));
-        }
-        edge += 2 * window;
-    }
-    out
-}
-
 impl Traffic {
     /// Builds a pattern. `load` is the offered rate per key as a multiple of the limit.
     pub fn build(
@@ -77,26 +49,8 @@ impl Traffic {
         if !(secs.is_finite() && secs > 0.0 && secs <= 600.0) {
             return Err("secs must be between 0 and 600".to_owned());
         }
-        if !(load.is_finite() && load > 0.0 && load <= 100.0) {
-            return Err("load must be between 0 and 100".to_owned());
-        }
-        let keys = keys.clamp(1, 10_000);
         let d = Duration::from_nanos(ms_to_nanos(secs * 1_000.0));
-        // Mean gap between any two requests for `load` × the limit on every key.
-        let rate_per_ns = f64::from(limit) * load * f64::from(keys) / config.window_nanos() as f64;
-        let gap = Duration::from_nanos((1.0 / rate_per_ns).max(1.0) as u64);
-        let window = config.window();
-        let arrivals = match pattern {
-            "steady" => sim::poisson(seed, d, gap, keys),
-            // Twice the rate while on, silent while off: the same average load.
-            "bursty" => sim::on_off(seed, d, gap / 2, window, window, keys),
-            "heavy_tailed" => sim::pareto(seed, d, gap, keys),
-            // A quarter of the load at the trough, twice it at the peak.
-            "diurnal" => sim::diurnal(seed, d, gap * 4, gap / 2, d, keys),
-            "flash_crowd" => sim::flash_crowd(seed, d, gap, keys, d / 3, d / 3, 10),
-            "boundary_attack" => repeated_attack(config, secs),
-            other => return Err(format!("unknown pattern {other:?}")),
-        };
+        let arrivals = sim::patterns::generate(pattern, seed, d, config, keys, load)?;
         Ok(Traffic { arrivals })
     }
 

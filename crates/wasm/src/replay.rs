@@ -5,75 +5,30 @@ use crate::cluster::{ClusterOptions, ClusterView, STRATEGIES};
 use crate::traffic::{Traffic, config};
 use ratelab::{Algorithm, ManualClock};
 use sim::Arrival;
-use std::collections::HashMap;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 
 /// The most requests each key sent in any window, sorted ascending.
 pub fn key_peaks(arrivals: &[Arrival], window_ns: u64) -> Vec<u64> {
-    let mut by_key: HashMap<u32, Vec<(u64, u64)>> = HashMap::new();
-    for a in arrivals {
-        by_key.entry(a.key).or_default().push((a.at.0, a.cost.0));
-    }
-    let mut peaks: Vec<u64> = by_key
-        .values()
-        .map(|list| {
-            let (mut lo, mut sum, mut best) = (0usize, 0u64, 0u64);
-            for &(at, cost) in list {
-                sum += cost;
-                while at - list[lo].0 >= window_ns {
-                    sum -= list[lo].1;
-                    lo += 1;
-                }
-                best = best.max(sum);
-            }
-            best
-        })
-        .collect();
-    peaks.sort_unstable();
-    peaks
-}
-
-fn quantile(sorted: &[u64], q: f64) -> u64 {
-    if sorted.is_empty() {
-        return 0;
-    }
-    let rank = ((q * sorted.len() as f64).ceil() as usize).clamp(1, sorted.len());
-    sorted[rank - 1]
+    sim::replay::key_peaks(arrivals, std::time::Duration::from_nanos(window_ns))
 }
 
 /// Requests the exact rule blocks at `limit`, as % of all requests.
+#[cfg(test)]
 fn exact_blocked_pct(arrivals: &[Arrival], limit: u64, window_ms: f64) -> Result<f64, String> {
     let config = config(u32::try_from(limit).unwrap_or(u32::MAX), window_ms)?;
-    let clock = Arc::new(ManualClock::new());
-    let exact = Algorithm::SlidingWindow.build(config, Arc::clone(&clock));
-    let trace = sim::run(&exact, &clock, arrivals);
-    Ok(trace.denied() as f64 * 100.0 / arrivals.len().max(1) as f64)
+    Ok(sim::replay::exact_blocked_pct(arrivals, config))
 }
 
 /// The smallest per-key limit for which the exact rule blocks at most
-/// `max_blocked_pct` % of requests. Binary search between 1 and the busiest key's peak.
+/// `max_blocked_pct` % of requests (see [`sim::replay::recommend_limit`]).
 pub fn recommend_limit(
     arrivals: &[Arrival],
     window_ms: f64,
     max_blocked_pct: f64,
 ) -> Result<u64, String> {
-    let window_ns = config(1, window_ms)?.window_nanos();
-    let mut hi = key_peaks(arrivals, window_ns)
-        .last()
-        .copied()
-        .unwrap_or(1)
-        .max(1);
-    let mut lo = 1u64;
-    while lo < hi {
-        let mid = lo + (hi - lo) / 2;
-        if exact_blocked_pct(arrivals, mid, window_ms)? <= max_blocked_pct {
-            hi = mid;
-        } else {
-            lo = mid + 1;
-        }
-    }
-    Ok(lo)
+    let window = config(1, window_ms)?.window();
+    sim::replay::recommend_limit(arrivals, window, max_blocked_pct).map_err(|e| e.to_string())
 }
 
 /// What every algorithm and strategy would have done with a log.
@@ -130,9 +85,9 @@ impl ReplayReport {
             requests: as_u32(traffic.len() as u64),
             keys: as_u32(peaks.len() as u64),
             duration_ms: traffic.duration_ms(),
-            peak_p50: as_u32(quantile(&peaks, 0.5)),
-            peak_p90: as_u32(quantile(&peaks, 0.9)),
-            peak_p99: as_u32(quantile(&peaks, 0.99)),
+            peak_p50: as_u32(sim::replay::quantile(&peaks, 0.5)),
+            peak_p90: as_u32(sim::replay::quantile(&peaks, 0.9)),
+            peak_p99: as_u32(sim::replay::quantile(&peaks, 0.99)),
             peak_max: as_u32(peaks.last().copied().unwrap_or(0)),
             algorithms: Vec::new(),
             algorithm_blocked_pct: Vec::new(),
