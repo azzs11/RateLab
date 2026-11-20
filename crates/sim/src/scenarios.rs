@@ -34,7 +34,7 @@ fn log2_q32(x: u64) -> u64 {
 }
 
 /// A standard exponential variate (mean 1) in Q32: `-ln(U)` with `U` uniform in (0, 1].
-fn exponential_q32(rng: &mut SplitMix64) -> u64 {
+pub(crate) fn exponential_q32(rng: &mut SplitMix64) -> u64 {
     let u = (rng.next_u64() >> Q).max(1); // 1..=2^32-1, as U × 2^32
     let neg_log2 = (u64::from(Q) << Q) - log2_q32(u);
     ((u128::from(neg_log2) * LN2_Q32) >> Q) as u64
@@ -52,7 +52,7 @@ fn pareto2_q32(rng: &mut SplitMix64) -> u64 {
 }
 
 /// Scales a Q32 variate by a mean gap in nanoseconds.
-fn scale(variate_q32: u64, mean_gap_ns: u64) -> u64 {
+pub(crate) fn scale(variate_q32: u64, mean_gap_ns: u64) -> u64 {
     u64::try_from((u128::from(variate_q32) * u128::from(mean_gap_ns)) >> Q).unwrap_or(u64::MAX)
 }
 

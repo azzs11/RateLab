@@ -39,6 +39,7 @@ use std::time::Duration;
 
 pub mod cluster;
 pub mod metrics;
+pub mod overload;
 mod scenarios;
 pub use scenarios::{diurnal, flash_crowd, merge, on_off, pareto, poisson};
 
