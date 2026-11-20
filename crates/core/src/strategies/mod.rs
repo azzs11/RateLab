@@ -13,12 +13,15 @@
 //! |---|---|---|
 //! | [`CentralExact`] | one round trip per request | exact, but every request waits for the store |
 //! | [`LocalSplit`] | none | each node gets `limit / N`; wrong when traffic is uneven |
+//! | [`AsyncSync`] | one sync per active key per interval per node | no waiting; over-admits between syncs |
 
+mod async_sync;
 mod bucket;
 mod central;
 mod local_split;
 mod store;
 
+pub use async_sync::AsyncSync;
 pub use bucket::ShareBucket;
 pub use central::CentralExact;
 pub use local_split::LocalSplit;
@@ -150,6 +153,11 @@ pub enum Strategy {
     },
     /// [`LocalSplit`].
     LocalSplit,
+    /// [`AsyncSync`], syncing every `interval`.
+    AsyncSync {
+        /// Time between syncs.
+        interval: Duration,
+    },
 }
 
 impl Strategy {
@@ -164,6 +172,7 @@ impl Strategy {
             Strategy::CentralExact { node_clock: false } => "central_exact",
             Strategy::CentralExact { node_clock: true } => "central_exact_node_clock",
             Strategy::LocalSplit => "local_split",
+            Strategy::AsyncSync { .. } => "async_sync",
         }
     }
 
@@ -197,6 +206,7 @@ impl Strategy {
                 Box::new(CentralExact::new(policy, node_clock))
             }
             Strategy::LocalSplit => Box::new(LocalSplit::new(config, nodes)),
+            Strategy::AsyncSync { interval } => Box::new(AsyncSync::new(config, nodes, interval)),
         }
     }
 }

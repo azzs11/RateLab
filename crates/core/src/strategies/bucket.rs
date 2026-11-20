@@ -33,11 +33,37 @@ impl ShareBucket {
     /// # Ok::<(), drl_core::ConfigError>(())
     /// ```
     pub fn new(config: RateLimitConfig, share: u64, now: Nanos) -> Self {
+        Self::with_shares(config, share, share, now)
+    }
+
+    /// A full bucket holding `limit / capacity_share` tokens and refilling at
+    /// `limit / rate_share` per window. Shares of 0 are treated as 1.
+    ///
+    /// ```
+    /// use drl_core::strategies::ShareBucket;
+    /// use drl_core::{Nanos, RateLimitConfig};
+    ///
+    /// // Can hold the whole limit, but refills at a third of the rate.
+    /// let config = RateLimitConfig::per_second(9)?;
+    /// let mut b = ShareBucket::with_shares(config, 1, 3, Nanos::ZERO);
+    /// assert_eq!(b.take_up_to(100), 9);
+    /// b.refill(Nanos(1_000_000_000));
+    /// assert_eq!(b.tokens(), 3);
+    /// # Ok::<(), drl_core::ConfigError>(())
+    /// ```
+    pub fn with_shares(
+        config: RateLimitConfig,
+        capacity_share: u64,
+        rate_share: u64,
+        now: Nanos,
+    ) -> Self {
         let window = u128::from(config.window_nanos());
         let limit = u128::from(config.limit());
-        let capacity = limit * window;
+        let rate_share = u128::from(rate_share.max(1));
+        let unit = window * rate_share;
+        let capacity = limit * unit / u128::from(capacity_share.max(1));
         Self {
-            unit: window * u128::from(share.max(1)),
+            unit,
             capacity,
             rate: limit,
             level: capacity,
