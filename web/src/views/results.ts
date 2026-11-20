@@ -4,6 +4,7 @@
 import { loadResults, machineLine, type Machine, type StrategyResults, type Summary } from "../lib/data";
 import { h } from "../lib/dom";
 import { fmtInt, fmtNum, fmtPct, fmtRate, pretty } from "../lib/format";
+import { goodputChart, goodputLegend, type GoodputLine } from "../components/goodput";
 
 const REPO = "https://github.com/azzs11/distributed-rate-limiter";
 
@@ -112,14 +113,81 @@ interface RealStrategies {
   rows: { strategy: string; scenario: string; real_error_pct: Summary; sim_error_pct: Summary; real_calls_per_1k: Summary; sim_calls_per_1k: Summary }[];
 }
 
+interface OverloadAgg {
+  goodput_pct: Summary;
+  p99_ms: Summary;
+  shed_pct: Summary;
+  timeout_pct: Summary;
+}
+
+interface Overload {
+  machine: Machine;
+  size: { run_secs: number; sim_seeds: number; real_seeds: number };
+  workers: number;
+  service_ms: number;
+  deadline_ms: number;
+  scenarios: {
+    name: string;
+    description: string;
+    rows: { limiter: string; sim: OverloadAgg; real: OverloadAgg | null }[];
+    series: (GoodputLine & { source: string })[];
+  }[];
+}
+
+function overloadBlock(o: Overload): HTMLElement {
+  const capacity = Math.round((o.workers * 1000) / o.service_ms);
+  const body: HTMLElement[] = [];
+  for (const sc of o.scenarios) {
+    const source = sc.series.some((l) => l.source === "real") ? "real" : "simulated";
+    const lines = sc.series.filter((l) => l.source === source);
+    const title = `${pretty(sc.name)}: successful answers per second (${source}, seed 1)`;
+    const best = Math.max(...sc.rows.map((r) => (r.real ?? r.sim).goodput_pct.mean));
+    body.push(
+      h(
+        "figure",
+        { class: "stack" },
+        h("h3", {}, pretty(sc.name)),
+        h("p", {}, `${sc.description.charAt(0).toUpperCase()}${sc.description.slice(1)}.`),
+        goodputChart(lines, title),
+        goodputLegend(),
+        h("figcaption", { class: "note" }, title),
+      ),
+      table(
+        `${pretty(sc.name)}: goodput is % of what could have succeeded`,
+        ["Limit", "Goodput real", "Goodput sim", "p99 real", "p99 sim", "Shed", "Timed out"],
+        sc.rows.map((r) => {
+          const a = r.real ?? r.sim;
+          return [
+            pretty(r.limiter),
+            barCell(a.goodput_pct.mean, best, r.real ? fmtPct(r.real.goodput_pct.mean, 1) : "–"),
+            fmtPct(r.sim.goodput_pct.mean, 1),
+            r.real ? `${fmtInt(r.real.p99_ms.mean)} ms` : "–",
+            `${fmtInt(r.sim.p99_ms.mean)} ms`,
+            fmtPct(a.shed_pct.mean, 1),
+            fmtPct(a.timeout_pct.mean, 1),
+          ];
+        }),
+      ),
+    );
+  }
+  return block(
+    "overload",
+    "Overload, with and without a concurrency limit",
+    `A backend with ${o.workers} workers and a ${o.service_ms} ms mean service time (${fmtInt(capacity)} requests/s) behind a server that answers 504 after ${o.deadline_ms} ms, and never cancels late work. Every limit gets the same requests, ${o.size.sim_seeds} seed${o.size.sim_seeds === 1 ? "" : "s"} in the simulator and ${o.size.real_seeds} on the server's real concurrency layer, ${o.size.run_secs} s each. The static limit is the healthy worker count.`,
+    o.machine,
+    ...body,
+  );
+}
+
 export default async function results(root: HTMLElement) {
-  const [local, memory, cluster, strategies, traces, real] = await Promise.all([
+  const [local, memory, cluster, strategies, traces, real, overload] = await Promise.all([
     loadResults<Local>("local"),
     loadResults<Memory>("memory"),
     loadResults<Cluster>("cluster"),
     loadResults<StrategyResults>("strategies"),
     loadResults<Traces>("traces"),
     loadResults<RealStrategies>("real_strategies"),
+    loadResults<Overload>("overload"),
   ]);
 
   root.append(
@@ -376,6 +444,8 @@ export default async function results(root: HTMLElement) {
       ),
     );
   }
+
+  if (overload) root.append(overloadBlock(overload));
 
   root.append(h("div", { class: "spacer" }));
   return () => {};

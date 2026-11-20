@@ -22,8 +22,10 @@ Five rate limiting algorithms behind one `RateLimiter` trait, with thread-safe
 state and injected time; a Redis store that several nodes share, behind a circuit
 breaker; an Axum server whose Tower layer sends IETF `RateLimit` headers; five
 **coordination strategies** for enforcing one limit across N nodes, compared in a
-deterministic cluster simulator; and a benchmark that measures accuracy against an
-exact oracle, on one machine and on a 3-node Docker cluster.
+deterministic cluster simulator; an adaptive **concurrency limit** (AIMD and
+Gradient2) that sheds overload before it turns into timeouts; and a benchmark that
+measures accuracy against an exact oracle, on one machine and on a 3-node Docker
+cluster.
 
 The project is being reworked into a rate limiter that **measures and reports
 its own accuracy**. See [docs/ROADMAP.md](docs/ROADMAP.md) for the plan.
@@ -118,6 +120,25 @@ Callers are identified by the `x-api-key` header, else their IP. Time values are
 rounded **up** to whole seconds, so a client that waits `Retry-After` never retries
 too early. `/metrics` exports Prometheus counters and a decision-time histogram
 (through the `metrics` crate).
+
+#### Overload protection
+
+A rate limit caps requests per window, but it cannot see a backend slow down: it keeps
+admitting the same rate, queues grow past the clients' deadlines, and the backend
+spends its time on answers nobody waits for. `ConcurrencyLimitLayer` caps requests
+**in flight** instead and answers `503` at once above the limit. The limit can be
+static or adapt to what each finished request reports:
+
+- **AIMD:** +1 while the limit is in use, ×0.9 on a timeout or `5xx`;
+- **Gradient2:** shrinks when recent latency rises above 1.5× its long-term average.
+
+```bash
+cargo run -p server --bin web-server -- --concurrency gradient2   # or aimd, fixed:64, off
+```
+
+The layer sits outside the rate limit (a shed request spends no quota) and reports the
+current limit in `x-drl-concurrency-limit`. Both algorithms follow Netflix's
+`concurrency-limits` library and live in `drl_core::concurrency`, with no I/O.
 
 ### Other
 
@@ -330,8 +351,12 @@ and the table above:
 6. `just cluster-strategies`: **every strategy on the real cluster** with Redis as the
    shared store, and the simulator fed the same recorded requests
    (`results/real_strategies.json`);
-7. `cargo run -p bench --release -- report`: the Markdown and the Pareto charts, from
-   the JSON files only.
+7. `cargo run -p bench --release -- overload`: **overload**: no limit, a static limit,
+   AIMD and Gradient2 in front of a backend with limited capacity, during a load ramp
+   and a capacity change, in the simulator and on the real Tower layer with the same
+   requests (`results/overload.json`, about 5 minutes);
+8. `cargo run -p bench --release -- report`: the Markdown and the charts, from the JSON
+   files only.
 
 Everything a run needs is removed as soon as it finishes: the downloaded log only ever
 lives in memory, and each Docker run removes its containers, networks, volumes and
@@ -349,6 +374,8 @@ cache).
 - **Scenarios:** seeded, so accuracy numbers are reproducible bit for bit.
 - **Latency and throughput:** warmed up, then repeated; the tables show mean and
   min–max.
+- **Overload:** goodput counts answers `200` within the deadline, as a share of what
+  the backend could have served; latency is for those answers.
 - **Machine:** every result file records the machine, OS, rustc and commit it was
   measured on.
 
@@ -362,6 +389,9 @@ cache).
   recorded requests, and RESULTS.md reports the largest gap.
 - **Real traffic:** the public log is from 1995 and has one-second timestamps; it shows
   how real clients behave (many sparse, a few heavy), not today's API volumes.
+- **Overload:** the backend is a model (a worker pool with random service times), and
+  the real run drives the Axum router in-process, without a network, so it measures the
+  limiter and the server rather than a deployment.
 - **Latency on macOS:** the clock ticks too coarsely to time one call, so latency is
   timed in batches of calls (see RESULTS.md).
 
