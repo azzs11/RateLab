@@ -30,6 +30,7 @@
 pub mod algorithms;
 pub mod breaker;
 pub mod clock;
+pub mod concurrency;
 pub mod decision;
 pub mod strategies;
 pub mod units;
