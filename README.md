@@ -121,6 +121,30 @@ rounded **up** to whole seconds, so a client that waits `Retry-After` never retr
 too early. `/metrics` exports Prometheus counters and a decision-time histogram
 (through the `metrics` crate).
 
+#### Token limits for LLM traffic
+
+An LLM request costs its prompt tokens, known on arrival, and its answer's tokens,
+known only when the answer has finished streaming. `drl_core::tokens` keeps an input
+and an output budget per tenant, charges tokens times a per-model weight (so a large
+model can cost more per token), and offers three ways to charge for the answer:
+
+| Accounting | At admission | When the answer is done |
+|---|---|---|
+| `estimate_only` | a learned estimate | nothing |
+| `reserve_max` | the request's `max_tokens` | refund what was not used |
+| `admit_then_reconcile` | a learned estimate | charge or refund the difference; a shortfall is debt, and the tenant waits until the refill repays it |
+
+```bash
+cargo run -p server --bin web-server -- --llm --token-accounting admit_then_reconcile
+curl -N -H 'x-api-key: alice' -d '{"model":"small","prompt_tokens":120,"max_tokens":200}' \
+     localhost:3001/v1/completions
+```
+
+`--llm` serves a mock model at `POST /v1/completions` that streams one server-sent
+event per token. `TokenLimitLayer` counts the tokens as they stream back and reconciles
+when the stream ends, or when the client hangs up, so a client pays for exactly what
+it received.
+
 #### Overload protection
 
 A rate limit caps requests per window, but it cannot see a backend slow down: it keeps
@@ -362,7 +386,11 @@ and the table above:
    AIMD and Gradient2 in front of a backend with limited capacity, during a load ramp
    and a capacity change, in the simulator and on the real Tower layer with the same
    requests (`results/overload.json`, about 5 minutes);
-8. `cargo run -p bench --release -- report`: the Markdown and the charts, from the JSON
+8. `cargo run -p bench --release -- llm`: **LLM tokens**: estimate-only, reserve-max
+   and admit-then-reconcile on real requests from the Azure LLM inference trace
+   (downloaded into memory, never saved) and on synthetic requests, plus a real-time
+   check through the server's layer (`results/llm.json`, about 3 minutes);
+9. `cargo run -p bench --release -- report`: the Markdown and the charts, from the JSON
    files only.
 
 Everything a run needs is removed as soon as it finishes: the downloaded log only ever
@@ -396,6 +424,9 @@ cache).
   recorded requests, and RESULTS.md reports the largest gap.
 - **Real traffic:** the public log is from 1995 and has one-second timestamps; it shows
   how real clients behave (many sparse, a few heavy), not today's API volumes.
+- **LLM tokens:** the Azure trace has no user ids, so requests are spread over tenants
+  by a seeded draw, and it records token counts but not timings, so answers stream at
+  an assumed speed.
 - **Overload:** the backend is a model (a worker pool with random service times), and
   the real run drives the Axum router in-process, without a network, so it measures the
   limiter and the server rather than a deployment.
@@ -430,7 +461,6 @@ test pauses Redis with `CLIENT PAUSE` instead of waiting.
 These features are **not built yet**:
 
 - **Multi-tier limits:** per user, IP, endpoint and global limits combined
-- **LLM token limits in the playground:** with the token-aware limiter (Phase 5)
 
 The full phase plan is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
