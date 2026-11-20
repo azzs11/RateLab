@@ -1,0 +1,16 @@
+[package]
+name = "drl-redis-store"
+description = "Redis-backed token bucket prototype for drl-core."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+drl-core.workspace = true
+thiserror.workspace = true
+redis = { version = "1.8", features = ["script"] }
+
+[lints]
+workspace = true

@@ -1,0 +1,23 @@
+[package]
+name = "server"
+description = "Web dashboard and demo binary for the rate limiter."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+drl-core = { workspace = true, features = ["std-clock"] }
+drl-redis-store.workspace = true
+tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "time"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+prometheus = "0.14"
+actix-web = "4.20"
+actix-cors = "0.7"
+actix-files = "0.7"
+
+[lints]
+workspace = true

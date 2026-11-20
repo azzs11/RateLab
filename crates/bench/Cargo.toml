@@ -1,0 +1,22 @@
+[package]
+name = "bench"
+description = "Benchmarks and measurement scenarios for the rate limiter."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+drl-core = { workspace = true, features = ["std-clock"] }
+
+[dev-dependencies]
+criterion = { version = "0.8", features = ["html_reports"] }
+
+[[bench]]
+name = "benchmark"
+harness = false
+
+[lints]
+workspace = true

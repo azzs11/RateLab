@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/License-MIT-blue)
 ![Stars](https://img.shields.io/github/stars/azzs11/distributed-rate-limiter?style=social)
 
-**Rate limiting algorithms in Rust (token bucket, leaky bucket, fixed and sliding window) with a Redis-backed prototype.**
+**Rate limiting algorithms in Rust (token bucket, leaky bucket, fixed and sliding window, GCRA) with a Redis-backed prototype.**
 
 [Features](#features) • [Quick Start](#quick-start) • [Benchmarks](#benchmarks) • [Roadmap](#roadmap)
 
@@ -16,10 +16,9 @@
 
 ## Overview
 
-This crate implements four classic rate limiting algorithms behind one
-`RateLimiter` trait. It also includes Prometheus metrics, a small Actix web
-dashboard for trying the algorithms interactively, and a Redis-backed token
-bucket prototype.
+Five rate limiting algorithms behind one `RateLimiter` trait, with thread-safe
+state and injected time, plus Prometheus metrics, a small Actix web dashboard for
+trying the algorithms interactively, and a Redis-backed token bucket prototype.
 
 The project is being reworked into a rate limiter that **measures and reports
 its own accuracy**. See [docs/ROADMAP.md](docs/ROADMAP.md) for the plan.
@@ -28,34 +27,62 @@ its own accuracy**. See [docs/ROADMAP.md](docs/ROADMAP.md) for the plan.
 
 ## Features
 
-### Algorithms (in-process)
+### Algorithms (in-process, `drl-core`)
 
 | Algorithm | How it works | Trade-off |
 |-----------|--------------|-----------|
-| **Token Bucket** | Tokens refill at a constant rate; each request spends one | Allows bursts up to the bucket size |
+| **Token Bucket** | Tokens refill at a constant rate; each request spends its cost | Allows bursts up to the bucket size |
 | **Leaky Bucket** | Requests fill a bucket that drains at a constant rate | Smooths bursts; bursty traffic gets rejected |
-| **Fixed Window** | Counts requests per fixed time window | Simplest; can admit a burst above the limit around a window boundary |
-| **Sliding Window** | Stores each request timestamp in the window | Exact limit, but memory grows with the limit |
+| **Fixed Window** | Counts usage per fixed time window | Simplest; can admit a burst above the limit around a window boundary |
+| **Sliding Window** | Stores each admitted request in the window | Exact limit, but memory grows with the limit |
+| **GCRA** | Tracks one theoretical arrival time per key | Same decisions as the token bucket, one number of state per key |
 
-These limiters keep state in a per-instance `HashMap`. They are **not**
-shared between processes.
+How they behave:
+
+- **One API:** `check(&self, key, cost)` returns a `Decision` with `allowed`,
+  `remaining`, `reset_after` and `retry_after`.
+- **Thread-safe:** limiters take `&self` and keep per-key state in a `DashMap`, so one
+  instance can be shared across threads. State is **not** shared between processes.
+- **Injected time:** algorithms read time from a `Clock`. Tests use `ManualClock`
+  and never sleep.
+- **Exact integer arithmetic:** the same inputs give the same decisions on every
+  platform, including WebAssembly.
+- **Shared conformance suite:** every algorithm must pass the same tests
+  (`crates/core/tests/conformance.rs`), including an exact `retry_after` and a
+  multi-threaded no-over-admission check.
 
 ### Redis prototype
 
-`RedisRateLimiter` (`src/redis_limiter.rs`) runs a token bucket as an atomic
+`RedisRateLimiter` (`crates/redis-store`) runs a token bucket as an atomic
 Lua script in Redis, so several processes could share one limit. It is a
 **prototype**:
 
 - The web server does **not** use it yet. The dashboard only runs the
   in-process algorithms.
 - It opens a new Redis connection on every request.
+- It uses the application server's clock, not Redis `TIME`.
 - `check_with_fallback` fails open (allows the request) when Redis is
   unreachable. That is a fallback, not a circuit breaker.
 
 ### Other
 
-- **Prometheus metrics:** request counters and a latency histogram (`src/metrics.rs`)
+- **Prometheus metrics:** request counters and a latency histogram (`crates/server/src/metrics.rs`)
 - **Web dashboard:** run a burst of requests against any algorithm and see allowed/blocked results
+- **Simulator** (`crates/sim`): seeded, deterministic traffic (jittered, bursty, the
+  fixed-window boundary attack) replayed through any limiter
+- **WebAssembly bindings** (`crates/wasm`): the same algorithms, compiled for the
+  browser, for the upcoming playground
+
+### Workspace layout
+
+| Crate | What it holds |
+|-------|---------------|
+| `crates/core` (`drl-core`) | Algorithms, `Clock`, `Decision`, unit newtypes. No I/O. |
+| `crates/redis-store` (`drl-redis-store`) | Redis-backed token bucket prototype |
+| `crates/server` | Actix web dashboard (`web-server`) and demo binary (`demo`) |
+| `crates/sim` | Deterministic traffic simulation |
+| `crates/wasm` | wasm-bindgen wrapper for the browser |
+| `crates/bench` | Criterion benchmarks and measurement scenarios |
 
 ---
 
@@ -77,7 +104,7 @@ Lua script in Redis, so several processes could share one limit. It is a
 </p>
 
 ```bash
-cargo run --bin web-server
+cargo run -p server --bin web-server
 # then open http://localhost:3001
 ```
 
@@ -87,7 +114,7 @@ cargo run --bin web-server
 
 ### Prerequisites
 
-- Rust (stable) via [rustup](https://rustup.rs/)
+- Rust 1.89 or newer via [rustup](https://rustup.rs/) (the minimum is checked in CI)
 - Redis (optional, only for the Redis prototype)
 
 ### Installation
@@ -97,52 +124,58 @@ git clone https://github.com/azzs11/distributed-rate-limiter.git
 cd distributed-rate-limiter
 
 cargo build --release
-cargo test
+cargo test --workspace
+
+cargo run -p server --bin demo        # terminal demo of every algorithm
+cargo run -p server --bin web-server  # dashboard on http://localhost:3001
 ```
 
 ### Basic usage
 
 ```rust
-use distributed_rate_limiter::algorithms::TokenBucket;
-use distributed_rate_limiter::{RateLimitConfig, RateLimiter};
+use drl_core::{Cost, RateLimitConfig, RateLimiter, TokenBucket};
 
 // 100 requests per second
-let config = RateLimitConfig::per_second(100);
-let mut limiter = TokenBucket::new(config);
+let config = RateLimitConfig::per_second(100)?;
+let limiter = TokenBucket::new(config);
 
-if limiter.allow_request("user_123").unwrap() {
-    println!("Request allowed");
+let decision = limiter.check("user_123", Cost::ONE);
+if decision.allowed {
+    println!("Request allowed, {} left", decision.remaining.0);
 } else {
-    println!("Rate limit exceeded");
+    println!("Rate limited, retry in {:?}", decision.retry_after);
 }
+```
+
+`limiter` takes `&self`, so you can wrap it in an `Arc` and share it across threads.
+Pick an algorithm at runtime with `"gcra".parse::<Algorithm>()?.build(config, clock)`.
+
+### Testing with a manual clock
+
+```rust
+use drl_core::{Cost, Gcra, ManualClock, RateLimitConfig, RateLimiter};
+
+let clock = ManualClock::new();
+let limiter = Gcra::with_clock(RateLimitConfig::per_second(2)?, &clock);
+
+assert!(limiter.check("k", Cost(2)).allowed);
+let denied = limiter.check("k", Cost::ONE);
+assert!(!denied.allowed);
+
+clock.advance(denied.retry_after.unwrap()); // no sleeping
+assert!(limiter.check("k", Cost::ONE).allowed);
 ```
 
 ### Redis prototype
 
 ```rust
-use distributed_rate_limiter::redis_limiter::RedisRateLimiter;
-use distributed_rate_limiter::{RateLimitConfig, RateLimiter};
+use drl_core::{Cost, RateLimitConfig};
+use drl_redis_store::RedisRateLimiter;
 
-let config = RateLimitConfig::per_second(1000);
-let mut limiter = RedisRateLimiter::new("redis://127.0.0.1/", config)?;
+let config = RateLimitConfig::per_second(1000)?;
+let limiter = RedisRateLimiter::new("redis://127.0.0.1/", config)?;
 
-limiter.allow_request("global_api_key")?;
-```
-
-### With metrics
-
-```rust
-use distributed_rate_limiter::metrics::{self, record_request};
-use std::time::Instant;
-
-metrics::init_metrics();
-
-let start = Instant::now();
-let allowed = limiter.allow_request("user")?;
-record_request(allowed, start);
-
-// Prometheus text format
-println!("{}", metrics::get_metrics());
+let decision = limiter.check("global_api_key", Cost::ONE)?;
 ```
 
 ---
@@ -157,10 +190,11 @@ You can measure on your own machine:
 
 ```bash
 # Criterion micro-benchmarks (HTML report in target/criterion/report/index.html)
-cargo bench
+cargo bench -p bench
 
-# Load tests, printing the throughput measured on this machine
-cargo test --release --test load_test -- --nocapture
+# Measurement scenarios, printing what this machine measures
+cargo run -p bench --release -- load
+cargo run -p bench --release -- latency
 ```
 
 ---
@@ -168,13 +202,15 @@ cargo test --release --test load_test -- --nocapture
 ## Testing
 
 ```bash
-cargo test                          # unit + integration tests
-cargo clippy --all-targets -- -D warnings
-cargo fmt -- --check
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --all -- --check
+
+# Needs a Redis server on 127.0.0.1:6379 (CI runs this against a Redis container)
+cargo test -p drl-redis-store -- --ignored
 ```
 
-The Redis test passes without a running Redis server: it skips itself when it
-cannot connect.
+No test sleeps: time-dependent tests drive a `ManualClock`.
 
 ---
 
@@ -193,8 +229,10 @@ The full phase plan is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Tech Stack
 
-- **Rust**: library, demo binary and web server
+- **Rust** (2024 edition): library, demo binary and web server
+- **DashMap**: thread-safe per-key state
 - **Redis**: distributed prototype (Lua scripting)
+- **wasm-bindgen**: WebAssembly bindings
 - **Prometheus** (`prometheus` crate): metrics
 - **Actix-web**: HTTP server
 - **Tailwind CSS** and **Chart.js** (via CDN): dashboard UI
@@ -205,7 +243,7 @@ The full phase plan is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/my-change`)
-3. Make sure `cargo test`, `cargo clippy --all-targets -- -D warnings` and `cargo fmt -- --check` pass
+3. Make sure `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo fmt --all -- --check` pass
 4. Open a pull request
 
 ---

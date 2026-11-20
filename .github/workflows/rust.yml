@@ -11,9 +11,9 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  check:
+    name: fmt, clippy, test
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v7
 
@@ -22,14 +22,78 @@ jobs:
       with:
         components: clippy, rustfmt
 
+    - uses: Swatinem/rust-cache@v2
+
     - name: Check formatting
-      run: cargo fmt -- --check
+      run: cargo fmt --all -- --check
 
     - name: Run clippy
-      run: cargo clippy --all-targets -- -D warnings
-
-    - name: Build
-      run: cargo build --verbose
+      run: cargo clippy --workspace --all-targets -- -D warnings
 
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --workspace
+
+    - name: No sleeps in library or test code
+      run: |
+        if grep -rn "sleep(" crates/core crates/sim crates/wasm crates/redis-store crates/bench/benches; then
+          echo "Tests must use the mock clock (drl_core::ManualClock), not sleep." >&2
+          exit 1
+        fi
+
+  msrv:
+    name: MSRV (1.89)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install Rust 1.89
+      uses: dtolnay/rust-toolchain@1.89
+
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Test on the minimum supported Rust version
+      run: cargo test --workspace
+
+  wasm:
+    name: wasm32 build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+        components: clippy
+
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Clippy for wasm32
+      run: cargo clippy -p wasm --target wasm32-unknown-unknown -- -D warnings
+
+    - name: Build for wasm32
+      run: cargo build -p wasm --target wasm32-unknown-unknown --release
+
+  redis:
+    name: Redis integration
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 10
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Run tests that need a live Redis
+      run: cargo test -p drl-redis-store -- --ignored

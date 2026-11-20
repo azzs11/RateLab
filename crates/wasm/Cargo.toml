@@ -1,0 +1,20 @@
+[package]
+name = "wasm"
+description = "WebAssembly bindings for drl-core, for the browser playground."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# wasm32-unknown-unknown has no system clock: time is passed in from JavaScript.
+drl-core.workspace = true
+wasm-bindgen = "0.2.130"
+
+[lints]
+workspace = true
