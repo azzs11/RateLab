@@ -1,0 +1,194 @@
+//! The shared store every strategy coordinates through: what Redis runs.
+//!
+//! One exact token bucket per key holds the **global** limit. Strategies talk to it
+//! only with [`StoreOp`] messages, so the same logic can be replayed in the simulator
+//! or implemented as Lua scripts in Redis.
+
+use super::bucket::ShareBucket;
+use super::{StoreOp, StoreReply};
+use crate::{Nanos, RateLimitConfig};
+use std::collections::HashMap;
+
+/// The global limit, one bucket per key.
+///
+/// ```
+/// use drl_core::strategies::{Store, StoreOp, StoreReply};
+/// use drl_core::{Nanos, RateLimitConfig};
+///
+/// let mut store = Store::new(RateLimitConfig::per_second(10)?);
+/// let reply = store.handle(Nanos::ZERO, "k", &StoreOp::Lease { want: 4 });
+/// assert_eq!(reply, StoreReply::Leased { granted: 4, retry_after: None });
+/// assert_eq!(store.tokens(Nanos::ZERO, "k"), 6);
+/// # Ok::<(), drl_core::ConfigError>(())
+/// ```
+#[derive(Debug, Clone)]
+pub struct Store {
+    config: RateLimitConfig,
+    buckets: HashMap<String, ShareBucket>,
+    ops: u64,
+}
+
+impl Store {
+    /// An empty store enforcing `config` per key.
+    pub fn new(config: RateLimitConfig) -> Self {
+        Self {
+            config,
+            buckets: HashMap::new(),
+            ops: 0,
+        }
+    }
+
+    /// The limit it enforces.
+    pub fn config(&self) -> RateLimitConfig {
+        self.config
+    }
+
+    /// Operations handled so far.
+    pub fn ops(&self) -> u64 {
+        self.ops
+    }
+
+    fn bucket(&mut self, key: &str, now: Nanos) -> &mut ShareBucket {
+        let config = self.config;
+        let bucket = self
+            .buckets
+            .entry(key.to_owned())
+            .or_insert_with(|| ShareBucket::new(config, 1, now));
+        bucket.refill(now);
+        bucket
+    }
+
+    /// Applies one operation at store time `now`.
+    pub fn handle(&mut self, now: Nanos, key: &str, op: &StoreOp) -> StoreReply {
+        self.ops += 1;
+        match *op {
+            StoreOp::Check { cost, at } => {
+                // `at` is the node's clock when the node supplies the time (as an
+                // application-clock Redis script would); otherwise the store's own.
+                let bucket = self.bucket(key, at.unwrap_or(now));
+                let allowed = bucket.try_take(cost.0);
+                StoreReply::Checked(bucket.decision(allowed, cost.0))
+            }
+            StoreOp::Lease { want } => {
+                let bucket = self.bucket(key, now);
+                let granted = bucket.take_up_to(want);
+                let retry_after = if granted == 0 {
+                    bucket.time_until(1)
+                } else {
+                    None
+                };
+                StoreReply::Leased {
+                    granted,
+                    retry_after,
+                }
+            }
+            StoreOp::Return { amount } => {
+                self.bucket(key, now).put(amount);
+                StoreReply::Returned
+            }
+            StoreOp::Sync { used } => {
+                let bucket = self.bucket(key, now);
+                bucket.take_saturating(used);
+                StoreReply::Synced {
+                    remaining: bucket.tokens(),
+                }
+            }
+        }
+    }
+
+    /// Tokens available for `key` at `now` (does not count as an operation).
+    pub fn tokens(&mut self, now: Nanos, key: &str) -> u64 {
+        self.bucket(key, now).tokens()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Cost;
+    use std::time::Duration;
+
+    fn store(limit: u64) -> Store {
+        Store::new(RateLimitConfig::per_second(limit).unwrap())
+    }
+
+    #[test]
+    fn check_is_an_exact_token_bucket() {
+        let mut s = store(2);
+        let check = |s: &mut Store, t: u64| match s.handle(
+            Nanos(t),
+            "k",
+            &StoreOp::Check {
+                cost: Cost::ONE,
+                at: None,
+            },
+        ) {
+            StoreReply::Checked(d) => d,
+            other => panic!("{other:?}"),
+        };
+        assert!(check(&mut s, 0).allowed);
+        assert!(check(&mut s, 0).allowed);
+        let denied = check(&mut s, 0);
+        assert_eq!(denied.retry_after, Some(Duration::from_millis(500)));
+        assert!(check(&mut s, 500_000_000).allowed);
+        assert_eq!(s.ops(), 4);
+    }
+
+    #[test]
+    fn node_supplied_time_is_used_when_given() {
+        let mut s = store(1);
+        let at = |t| StoreOp::Check {
+            cost: Cost::ONE,
+            at: Some(Nanos(t)),
+        };
+        assert!(matches!(s.handle(Nanos(0), "k", &at(0)), StoreReply::Checked(d) if d.allowed));
+        // Store time says no time passed, but the node claims a second did.
+        assert!(
+            matches!(s.handle(Nanos(0), "k", &at(1_000_000_000)), StoreReply::Checked(d) if d.allowed)
+        );
+    }
+
+    #[test]
+    fn leases_are_partial_when_scarce_and_hint_a_retry() {
+        let mut s = store(10);
+        let lease = |s: &mut Store, want| s.handle(Nanos(0), "k", &StoreOp::Lease { want });
+        assert_eq!(
+            lease(&mut s, 8),
+            StoreReply::Leased {
+                granted: 8,
+                retry_after: None
+            }
+        );
+        assert_eq!(
+            lease(&mut s, 8),
+            StoreReply::Leased {
+                granted: 2,
+                retry_after: None
+            }
+        );
+        assert_eq!(
+            lease(&mut s, 8),
+            StoreReply::Leased {
+                granted: 0,
+                retry_after: Some(Duration::from_millis(100))
+            }
+        );
+    }
+
+    #[test]
+    fn returns_and_syncs_adjust_the_global_bucket() {
+        let mut s = store(10);
+        s.handle(Nanos(0), "k", &StoreOp::Lease { want: 10 });
+        s.handle(Nanos(0), "k", &StoreOp::Return { amount: 4 });
+        assert_eq!(s.tokens(Nanos(0), "k"), 4);
+        assert_eq!(
+            s.handle(Nanos(0), "k", &StoreOp::Sync { used: 3 }),
+            StoreReply::Synced { remaining: 1 }
+        );
+        // More was spent than was left: the store stops at empty.
+        assert_eq!(
+            s.handle(Nanos(0), "k", &StoreOp::Sync { used: 5 }),
+            StoreReply::Synced { remaining: 0 }
+        );
+    }
+}
