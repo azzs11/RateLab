@@ -4,6 +4,8 @@
 //! - [`traffic::Traffic`]: seeded traffic patterns, or arrays from a user's log;
 //! - [`lab::LabRun`]: one algorithm over some traffic, with its state over time;
 //! - [`cluster::ClusterView`]: the multi-node simulator with any strategy;
+//! - [`overload::OverloadRun`]: concurrency limits in front of a backend with limited
+//!   capacity;
 //! - [`replay::ReplayReport`]: a log replayed through everything, plus a limit
 //!   recommendation.
 //!
@@ -26,6 +28,7 @@
 
 pub mod cluster;
 pub mod lab;
+pub mod overload;
 pub mod replay;
 pub mod traffic;
 
