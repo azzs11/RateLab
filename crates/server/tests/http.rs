@@ -183,3 +183,26 @@ fn caller_key_prefers_api_key_then_peer_ip() {
         .unwrap();
     assert_eq!(caller_key(&too_long), "anonymous");
 }
+
+#[tokio::test]
+async fn the_concurrency_limit_applies_to_the_api_routes_only() {
+    use drl_core::concurrency::{Concurrency, ConcurrencyLimiter};
+    let clock = Arc::new(ManualClock::new());
+    let config = RateLimitConfig::per_minute(3).unwrap();
+    let limits = Arc::new(Limits {
+        backend: Backend::Local {
+            limiter: Algorithm::TokenBucket.build(config, Arc::clone(&clock)),
+            config,
+        },
+        stats: Default::default(),
+        node_id: "node-test".to_owned(),
+    });
+    let limiter = Arc::new(ConcurrencyLimiter::new(Concurrency::Fixed(4)));
+    let app = app::router_with(limits, None, web_dir(), Some(Arc::clone(&limiter)));
+    let r = app.clone().oneshot(get("/api/hello", "a")).await.unwrap();
+    assert_eq!(r.status(), StatusCode::OK);
+    assert_eq!(header(&r, "x-drl-concurrency-limit"), Some("4"));
+    let r = app.oneshot(get("/health", "a")).await.unwrap();
+    assert_eq!(header(&r, "x-drl-concurrency-limit"), None);
+    assert_eq!(limiter.inflight(), 0);
+}

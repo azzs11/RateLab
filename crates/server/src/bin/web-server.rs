@@ -3,12 +3,14 @@
 //! ```text
 //! cargo run -p server --bin web-server                         # in-process limiter
 //! cargo run -p server --bin web-server -- --backend redis      # shared through Redis
+//! cargo run -p server --bin web-server -- --concurrency gradient2  # shed overload with 503
 //! ```
 //!
 //! Every flag can also be set by environment variable (`DRL_BACKEND`, `DRL_LIMIT`, ...).
 
 use anyhow::{Context, bail};
 use clap::{Parser, ValueEnum};
+use drl_core::concurrency::ConcurrencyLimiter;
 use drl_core::{
     Algorithm, BreakerConfig, CircuitBreaker, FailurePolicy, MonotonicClock, RateLimitConfig,
 };
@@ -75,6 +77,10 @@ struct Args {
     /// Enable the benchmark-only /admin routes (strategy switching). Never in production.
     #[arg(long, env = "DRL_ADMIN", default_value_t = false)]
     admin: bool,
+    /// Concurrency limit on the API routes: `off`, `fixed:N`, `aimd` or `gradient2`.
+    /// Requests above it get `503` at once instead of queueing.
+    #[arg(long, env = "DRL_CONCURRENCY", default_value = "off")]
+    concurrency: String,
     /// Directory with the built playground (`cd web && npm run build`). Static files are
     /// served from here when it exists.
     #[arg(long, env = "DRL_WEB_DIR", default_value = "web/dist")]
@@ -140,7 +146,16 @@ async fn main() -> anyhow::Result<()> {
             "no built playground found; serving the API only (build it with `just site`)"
         );
     }
-    let mut router = app::router(Arc::clone(&limits), Some(prometheus), &args.web_dir);
+    let concurrency = server::concurrency::parse(&args.concurrency).map_err(anyhow::Error::msg)?;
+    if let Some(c) = &concurrency {
+        tracing::info!(limit = c.name(), "concurrency limit on the API routes");
+    }
+    let mut router = app::router_with(
+        Arc::clone(&limits),
+        Some(prometheus),
+        &args.web_dir,
+        concurrency.map(|c| Arc::new(ConcurrencyLimiter::new(c))),
+    );
     if args.admin {
         tracing::warn!("benchmark-only /admin routes are enabled");
         router = router.merge(app::admin_router(limits));

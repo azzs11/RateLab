@@ -7,7 +7,10 @@
 //! | `GET /health`, `GET /metrics` | no | |
 //! | `GET /api/metrics` | no | |
 //! | everything else | no | the built playground (`web/dist`), if present |
+//!
+//! With [`router_with`], the two limited routes also get a concurrency limit.
 
+use crate::concurrency::ConcurrencyLimitLayer;
 use crate::layer::{Limits, RateLimitLayer, RoutePolicy};
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -15,6 +18,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use drl_core::FailurePolicy;
+use drl_core::concurrency::ConcurrencyLimiter;
 use metrics_exporter_prometheus::PrometheusHandle;
 use serde::Serialize;
 use std::path::Path;
@@ -41,12 +45,23 @@ pub fn router(
     prometheus: Option<PrometheusHandle>,
     web_dir: impl AsRef<Path>,
 ) -> Router {
+    router_with(limits, prometheus, web_dir, None)
+}
+
+/// [`router`], with the limited routes also behind a [`ConcurrencyLimitLayer`] when
+/// `concurrency` is given (outside the rate limit, so shed requests spend no quota).
+pub fn router_with(
+    limits: Arc<Limits>,
+    prometheus: Option<PrometheusHandle>,
+    web_dir: impl AsRef<Path>,
+    concurrency: Option<Arc<ConcurrencyLimiter>>,
+) -> Router {
     let [public, orders] = route_policies();
     let state = AppState {
         limits: Arc::clone(&limits),
         prometheus,
     };
-    Router::new()
+    let mut api = Router::new()
         .route(
             "/api/hello",
             get(hello).layer(RateLimitLayer::new(Arc::clone(&limits), public)),
@@ -54,8 +69,11 @@ pub fn router(
         .route(
             "/api/orders",
             post(create_order).layer(RateLimitLayer::new(Arc::clone(&limits), orders)),
-        )
-        .route("/health", get(|| async { "ok" }))
+        );
+    if let Some(limiter) = concurrency {
+        api = api.route_layer(ConcurrencyLimitLayer::new(limiter));
+    }
+    api.route("/health", get(|| async { "ok" }))
         .route("/metrics", get(prometheus_metrics))
         .route("/api/metrics", get(decision_totals))
         .fallback_service(ServeDir::new(web_dir))
