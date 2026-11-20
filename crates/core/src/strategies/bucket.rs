@@ -72,6 +72,17 @@ impl ShareBucket {
     }
 
     /// Adds the refill since the last call. Time that moves backwards adds nothing.
+    ///
+    /// ```
+    /// use ratelab::strategies::ShareBucket;
+    /// use ratelab::{Nanos, RateLimitConfig};
+    ///
+    /// let mut b = ShareBucket::new(RateLimitConfig::per_second(10)?, 1, Nanos::ZERO);
+    /// b.take_up_to(10);
+    /// b.refill(Nanos(100_000_000)); // 100 ms at 10 per second
+    /// assert_eq!(b.tokens(), 1);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn refill(&mut self, now: Nanos) {
         if now.0 > self.last {
             let added = u128::from(now.0 - self.last).saturating_mul(self.rate);
@@ -106,6 +117,17 @@ impl ShareBucket {
     }
 
     /// Whole tokens that would be available at `now`, without changing the bucket.
+    ///
+    /// ```
+    /// use ratelab::strategies::ShareBucket;
+    /// use ratelab::{Nanos, RateLimitConfig};
+    ///
+    /// let mut b = ShareBucket::new(RateLimitConfig::per_second(10)?, 1, Nanos::ZERO);
+    /// b.take_up_to(10);
+    /// assert_eq!(b.tokens_at(Nanos(500_000_000)), 5);
+    /// assert_eq!(b.tokens(), 0, "looking does not refill");
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn tokens_at(&self, now: Nanos) -> u64 {
         let added = u128::from(now.0.saturating_sub(self.last)).saturating_mul(self.rate);
         let level = self.level.saturating_add(added).min(self.capacity);
@@ -113,6 +135,15 @@ impl ShareBucket {
     }
 
     /// Whole tokens available.
+    ///
+    /// ```
+    /// use ratelab::strategies::ShareBucket;
+    /// use ratelab::{Nanos, RateLimitConfig};
+    ///
+    /// let mut b = ShareBucket::new(RateLimitConfig::per_second(10)?, 1, Nanos::ZERO);
+    /// assert_eq!(b.tokens(), 10);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn tokens(&self) -> u64 {
         u64::try_from(self.level / self.unit).unwrap_or(u64::MAX)
     }
@@ -122,6 +153,17 @@ impl ShareBucket {
     }
 
     /// Takes `n` tokens if all are available.
+    ///
+    /// ```
+    /// use ratelab::strategies::ShareBucket;
+    /// use ratelab::{Nanos, RateLimitConfig};
+    ///
+    /// let mut b = ShareBucket::new(RateLimitConfig::per_second(10)?, 1, Nanos::ZERO);
+    /// assert!(b.try_take(4));
+    /// assert!(!b.try_take(7));
+    /// assert_eq!(b.tokens(), 6);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn try_take(&mut self, n: u64) -> bool {
         let need = self.units(n);
         if need <= self.level {
@@ -133,6 +175,15 @@ impl ShareBucket {
     }
 
     /// Takes as many of `n` tokens as are available and returns how many.
+    ///
+    /// ```
+    /// use ratelab::strategies::ShareBucket;
+    /// use ratelab::{Nanos, RateLimitConfig};
+    ///
+    /// let mut b = ShareBucket::new(RateLimitConfig::per_second(10)?, 1, Nanos::ZERO);
+    /// assert_eq!(b.take_up_to(15), 10);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn take_up_to(&mut self, n: u64) -> u64 {
         let granted = n.min(self.tokens());
         self.level -= self.units(granted);
@@ -140,21 +191,67 @@ impl ShareBucket {
     }
 
     /// Removes `n` tokens, stopping at empty (tokens already spent elsewhere).
+    ///
+    /// ```
+    /// use ratelab::strategies::ShareBucket;
+    /// use ratelab::{Nanos, RateLimitConfig};
+    ///
+    /// let mut b = ShareBucket::new(RateLimitConfig::per_second(10)?, 1, Nanos::ZERO);
+    /// b.take_saturating(15);
+    /// assert_eq!(b.tokens(), 0);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn take_saturating(&mut self, n: u64) {
         self.level = self.level.saturating_sub(self.units(n));
     }
 
     /// Puts `n` unused tokens back, up to capacity.
+    ///
+    /// ```
+    /// use ratelab::strategies::ShareBucket;
+    /// use ratelab::{Nanos, RateLimitConfig};
+    ///
+    /// let mut b = ShareBucket::new(RateLimitConfig::per_second(10)?, 1, Nanos::ZERO);
+    /// b.take_up_to(5);
+    /// b.put(3);
+    /// assert_eq!(b.tokens(), 8);
+    /// b.put(100);
+    /// assert_eq!(b.tokens(), 10, "never above capacity");
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn put(&mut self, n: u64) {
         self.level = self.level.saturating_add(self.units(n)).min(self.capacity);
     }
 
     /// Sets the bucket to `n` tokens (capped at capacity).
+    ///
+    /// ```
+    /// use ratelab::strategies::ShareBucket;
+    /// use ratelab::{Nanos, RateLimitConfig};
+    ///
+    /// let mut b = ShareBucket::new(RateLimitConfig::per_second(10)?, 1, Nanos::ZERO);
+    /// b.set_tokens(4);
+    /// assert_eq!(b.tokens(), 4);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn set_tokens(&mut self, n: u64) {
         self.level = self.units(n).min(self.capacity);
     }
 
     /// Time until `n` tokens are available; `None` if `n` exceeds the capacity.
+    ///
+    /// ```
+    /// use ratelab::strategies::ShareBucket;
+    /// use ratelab::{Nanos, RateLimitConfig};
+    ///
+    /// let mut b = ShareBucket::new(RateLimitConfig::per_second(10)?, 1, Nanos::ZERO);
+    /// use std::time::Duration;
+    ///
+    /// b.take_up_to(10);
+    /// assert_eq!(b.time_until(2), Some(Duration::from_millis(200)));
+    /// assert_eq!(b.time_until(11), None);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn time_until(&self, n: u64) -> Option<Duration> {
         let need = self.units(n);
         if need > self.capacity {
@@ -165,6 +262,18 @@ impl ShareBucket {
     }
 
     /// The decision to report after an attempt to take `cost`.
+    ///
+    /// ```
+    /// use ratelab::strategies::ShareBucket;
+    /// use ratelab::{Nanos, RateLimitConfig};
+    ///
+    /// let mut b = ShareBucket::new(RateLimitConfig::per_second(10)?, 1, Nanos::ZERO);
+    /// let allowed = b.try_take(1);
+    /// let d = b.decision(allowed, 1);
+    /// assert!(d.allowed);
+    /// assert_eq!(d.remaining.0, 9);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn decision(&self, allowed: bool, cost: u64) -> Decision {
         let reset_ns = (self.capacity - self.level).div_ceil(self.rate);
         let reset = Duration::from_nanos(u64::try_from(reset_ns).unwrap_or(u64::MAX));

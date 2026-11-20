@@ -41,6 +41,16 @@ pub struct FixedWindow<C> {
 
 impl<C: Clock> FixedWindow<C> {
     /// A fixed window limiter that reads time from `clock`.
+    ///
+    /// ```
+    /// use ratelab::{Cost, ManualClock, RateLimitConfig, RateLimiter, FixedWindow};
+    ///
+    /// let clock = ManualClock::new();
+    /// let limiter = FixedWindow::with_clock(RateLimitConfig::per_second(1)?, &clock);
+    /// assert!(limiter.check("k", Cost::ONE).allowed);
+    /// assert!(!limiter.check("k", Cost::ONE).allowed);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn with_clock(config: RateLimitConfig, clock: C) -> Self {
         Self {
             limit: config.limit(),
@@ -54,6 +64,14 @@ impl<C: Clock> FixedWindow<C> {
 #[cfg(feature = "std-clock")]
 impl FixedWindow<crate::MonotonicClock> {
     /// A fixed window limiter on the real monotonic clock.
+    ///
+    /// ```
+    /// use ratelab::{Cost, RateLimitConfig, RateLimiter, FixedWindow};
+    ///
+    /// let limiter = FixedWindow::new(RateLimitConfig::per_minute(100)?);
+    /// assert!(limiter.check("k", Cost::ONE).allowed);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn new(config: RateLimitConfig) -> Self {
         Self::with_clock(config, crate::MonotonicClock::new())
     }

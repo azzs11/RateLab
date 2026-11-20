@@ -1,30 +1,7 @@
-//! Rate limiting algorithms with injected time and thread-safe per-key state.
-//!
-//! Every algorithm implements [`RateLimiter`]: `check(&self, key, cost)` returns a
-//! [`Decision`]. Limiters take `&self`, so one instance can be shared across threads
-//! (for example in an `Arc`). Time comes from a [`Clock`], so tests and simulations can
-//! use [`ManualClock`] instead of sleeping.
-//!
-//! ```
-//! use ratelab::{Cost, ManualClock, RateLimitConfig, RateLimiter, TokenBucket};
-//! use std::time::Duration;
-//!
-//! let clock = ManualClock::new();
-//! let limiter = TokenBucket::with_clock(RateLimitConfig::per_second(2)?, &clock);
-//!
-//! assert!(limiter.check("alice", Cost::ONE).allowed);
-//! assert!(limiter.check("alice", Cost::ONE).allowed);
-//! let denied = limiter.check("alice", Cost::ONE);
-//! assert!(!denied.allowed);
-//!
-//! // Wait exactly as long as the limiter says, then retry.
-//! clock.advance(denied.retry_after.unwrap());
-//! assert!(limiter.check("alice", Cost::ONE).allowed);
-//! # Ok::<(), ratelab::ConfigError>(())
-//! ```
-
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
+#![deny(rustdoc::broken_intra_doc_links)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
 pub mod algorithms;
@@ -124,16 +101,38 @@ impl RateLimitConfig {
     }
 
     /// Units allowed per window. Always at least 1.
+    ///
+    /// ```
+    /// use ratelab::RateLimitConfig;
+    ///
+    /// assert_eq!(RateLimitConfig::per_minute(60)?.limit(), 60);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn limit(&self) -> u64 {
         self.limit
     }
 
     /// The window length. Always longer than zero.
+    ///
+    /// ```
+    /// use ratelab::RateLimitConfig;
+    /// use std::time::Duration;
+    ///
+    /// assert_eq!(RateLimitConfig::per_minute(60)?.window(), Duration::from_secs(60));
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn window(&self) -> Duration {
         Duration::from_nanos(self.window_nanos)
     }
 
     /// The window length in nanoseconds. Always at least 1.
+    ///
+    /// ```
+    /// use ratelab::RateLimitConfig;
+    ///
+    /// assert_eq!(RateLimitConfig::per_second(5)?.window_nanos(), 1_000_000_000);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn window_nanos(&self) -> u64 {
         self.window_nanos
     }

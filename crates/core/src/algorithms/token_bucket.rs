@@ -44,6 +44,16 @@ pub struct TokenBucket<C> {
 
 impl<C: Clock> TokenBucket<C> {
     /// A token bucket that reads time from `clock`.
+    ///
+    /// ```
+    /// use ratelab::{Cost, ManualClock, RateLimitConfig, RateLimiter, TokenBucket};
+    ///
+    /// let clock = ManualClock::new();
+    /// let limiter = TokenBucket::with_clock(RateLimitConfig::per_second(1)?, &clock);
+    /// assert!(limiter.check("k", Cost::ONE).allowed);
+    /// assert!(!limiter.check("k", Cost::ONE).allowed);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn with_clock(config: RateLimitConfig, clock: C) -> Self {
         Self {
             limit: u128::from(config.limit()),
@@ -57,6 +67,14 @@ impl<C: Clock> TokenBucket<C> {
 #[cfg(feature = "std-clock")]
 impl TokenBucket<crate::MonotonicClock> {
     /// A token bucket on the real monotonic clock.
+    ///
+    /// ```
+    /// use ratelab::{Cost, RateLimitConfig, RateLimiter, TokenBucket};
+    ///
+    /// let limiter = TokenBucket::new(RateLimitConfig::per_minute(100)?);
+    /// assert!(limiter.check("k", Cost::ONE).allowed);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn new(config: RateLimitConfig) -> Self {
         Self::with_clock(config, crate::MonotonicClock::new())
     }

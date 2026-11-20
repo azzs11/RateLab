@@ -1,11 +1,18 @@
 [package]
 name = "ratelab"
-description = "Rate limiting algorithms (token bucket, leaky bucket, fixed and sliding window, GCRA)."
-version.workspace = true
+description = "Rate limiting with measured trade-offs: token bucket, leaky bucket, fixed and sliding window, GCRA, cluster coordination strategies, adaptive concurrency limits and token budgets for LLM traffic. No I/O, injected time."
+# Published on its own version line; the rest of the workspace is not published.
+version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/ratelab"
+homepage = "https://azzs11.github.io/distributed-rate-limiter/"
+keywords = ["rate-limiting", "gcra", "token-bucket", "concurrency", "llm"]
+categories = ["algorithms", "concurrency", "network-programming", "web-programming"]
+include = ["src/**/*.rs", "tests/**/*.rs", "README.md", "CHANGELOG.md", "LICENSE"]
 
 [dependencies]
 dashmap = "6.2"
@@ -15,6 +22,9 @@ thiserror.workspace = true
 default = ["std-clock"]
 # Real monotonic clock (reads std::time::Instant). Disable for wasm32-unknown-unknown.
 std-clock = []
+
+[package.metadata.docs.rs]
+all-features = true
 
 [lints]
 workspace = true

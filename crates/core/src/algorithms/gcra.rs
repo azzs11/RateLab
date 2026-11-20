@@ -39,6 +39,16 @@ pub struct Gcra<C> {
 
 impl<C: Clock> Gcra<C> {
     /// A GCRA limiter that reads time from `clock`.
+    ///
+    /// ```
+    /// use ratelab::{Cost, ManualClock, RateLimitConfig, RateLimiter, Gcra};
+    ///
+    /// let clock = ManualClock::new();
+    /// let limiter = Gcra::with_clock(RateLimitConfig::per_second(1)?, &clock);
+    /// assert!(limiter.check("k", Cost::ONE).allowed);
+    /// assert!(!limiter.check("k", Cost::ONE).allowed);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn with_clock(config: RateLimitConfig, clock: C) -> Self {
         Self {
             limit: u128::from(config.limit()),
@@ -52,6 +62,14 @@ impl<C: Clock> Gcra<C> {
 #[cfg(feature = "std-clock")]
 impl Gcra<crate::MonotonicClock> {
     /// A GCRA limiter on the real monotonic clock.
+    ///
+    /// ```
+    /// use ratelab::{Cost, RateLimitConfig, RateLimiter, Gcra};
+    ///
+    /// let limiter = Gcra::new(RateLimitConfig::per_minute(100)?);
+    /// assert!(limiter.check("k", Cost::ONE).allowed);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn new(config: RateLimitConfig) -> Self {
         Self::with_clock(config, crate::MonotonicClock::new())
     }

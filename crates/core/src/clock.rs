@@ -49,6 +49,13 @@ pub struct ManualClock {
 
 impl ManualClock {
     /// A clock starting at [`Nanos::ZERO`].
+    ///
+    /// ```
+    /// use ratelab::{Clock, ManualClock, Nanos};
+    ///
+    /// let clock = ManualClock::new();
+    /// assert_eq!(clock.now(), Nanos::ZERO);
+    /// ```
     pub fn new() -> Self {
         Self::starting_at(Nanos::ZERO)
     }
@@ -138,6 +145,14 @@ pub struct MonotonicClock {
 #[cfg(feature = "std-clock")]
 impl MonotonicClock {
     /// A clock whose origin is now.
+    ///
+    /// ```
+    /// use ratelab::{Clock, MonotonicClock};
+    ///
+    /// let clock = MonotonicClock::new();
+    /// let a = clock.now();
+    /// assert!(clock.now() >= a);
+    /// ```
     pub fn new() -> Self {
         Self {
             origin: std::time::Instant::now(),

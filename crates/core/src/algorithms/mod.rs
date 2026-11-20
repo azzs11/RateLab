@@ -1,7 +1,7 @@
 //! The single-node algorithms.
 //!
 //! All of them keep per-key state in a [`DashMap`], take time from an injected
-//! [`Clock`](crate::Clock), and use integer arithmetic only, so the same inputs always
+//! [`Clock`], and use integer arithmetic only, so the same inputs always
 //! give the same decisions on every platform.
 
 pub mod fixed_window;
@@ -49,6 +49,13 @@ impl Algorithm {
     ];
 
     /// The snake_case name used by [`FromStr`] and [`Display`](fmt::Display).
+    ///
+    /// ```
+    /// use ratelab::Algorithm;
+    ///
+    /// assert_eq!(Algorithm::Gcra.name(), "gcra");
+    /// assert_eq!("gcra".parse::<Algorithm>().map(Algorithm::name), Ok("gcra"));
+    /// ```
     pub fn name(self) -> &'static str {
         match self {
             Algorithm::TokenBucket => "token_bucket",

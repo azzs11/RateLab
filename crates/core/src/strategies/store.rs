@@ -30,6 +30,15 @@ pub struct Store {
 
 impl Store {
     /// An empty store enforcing `config` per key.
+    ///
+    /// ```
+    /// use ratelab::strategies::{Store, StoreOp};
+    /// use ratelab::{Nanos, RateLimitConfig};
+    ///
+    /// let mut store = Store::new(RateLimitConfig::per_second(10)?);
+    /// assert_eq!(store.tokens(Nanos::ZERO, "k"), 10);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn new(config: RateLimitConfig) -> Self {
         Self {
             config,
@@ -39,11 +48,30 @@ impl Store {
     }
 
     /// The limit it enforces.
+    ///
+    /// ```
+    /// use ratelab::strategies::{Store, StoreOp};
+    /// use ratelab::{Nanos, RateLimitConfig};
+    ///
+    /// let mut store = Store::new(RateLimitConfig::per_second(10)?);
+    /// assert_eq!(store.config().limit(), 10);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn config(&self) -> RateLimitConfig {
         self.config
     }
 
     /// Operations handled so far.
+    ///
+    /// ```
+    /// use ratelab::strategies::{Store, StoreOp};
+    /// use ratelab::{Nanos, RateLimitConfig};
+    ///
+    /// let mut store = Store::new(RateLimitConfig::per_second(10)?);
+    /// store.handle(Nanos::ZERO, "k", &StoreOp::Lease { want: 3 });
+    /// assert_eq!(store.ops(), 1);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn ops(&self) -> u64 {
         self.ops
     }
@@ -59,6 +87,16 @@ impl Store {
     }
 
     /// Applies one operation at store time `now`.
+    ///
+    /// ```
+    /// use ratelab::strategies::{Store, StoreOp, StoreReply};
+    /// use ratelab::{Nanos, RateLimitConfig};
+    ///
+    /// let mut store = Store::new(RateLimitConfig::per_second(10)?);
+    /// let reply = store.handle(Nanos::ZERO, "k", &StoreOp::Sync { used: 3 });
+    /// assert_eq!(reply, StoreReply::Synced { remaining: 7 });
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn handle(&mut self, now: Nanos, key: &str, op: &StoreOp) -> StoreReply {
         self.ops += 1;
         match *op {
@@ -111,6 +149,16 @@ impl Store {
     }
 
     /// Tokens available for `key` at `now` (does not count as an operation).
+    ///
+    /// ```
+    /// use ratelab::strategies::{Store, StoreOp};
+    /// use ratelab::{Nanos, RateLimitConfig};
+    ///
+    /// let mut store = Store::new(RateLimitConfig::per_second(10)?);
+    /// store.handle(Nanos::ZERO, "k", &StoreOp::Sync { used: 3 });
+    /// assert_eq!(store.tokens(Nanos::ZERO, "k"), 7);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn tokens(&mut self, now: Nanos, key: &str) -> u64 {
         self.bucket(key, now).tokens()
     }

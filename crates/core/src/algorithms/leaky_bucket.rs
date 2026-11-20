@@ -42,6 +42,16 @@ pub struct LeakyBucket<C> {
 
 impl<C: Clock> LeakyBucket<C> {
     /// A leaky bucket that reads time from `clock`.
+    ///
+    /// ```
+    /// use ratelab::{Cost, ManualClock, RateLimitConfig, RateLimiter, LeakyBucket};
+    ///
+    /// let clock = ManualClock::new();
+    /// let limiter = LeakyBucket::with_clock(RateLimitConfig::per_second(1)?, &clock);
+    /// assert!(limiter.check("k", Cost::ONE).allowed);
+    /// assert!(!limiter.check("k", Cost::ONE).allowed);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn with_clock(config: RateLimitConfig, clock: C) -> Self {
         Self {
             limit: u128::from(config.limit()),
@@ -55,6 +65,14 @@ impl<C: Clock> LeakyBucket<C> {
 #[cfg(feature = "std-clock")]
 impl LeakyBucket<crate::MonotonicClock> {
     /// A leaky bucket on the real monotonic clock.
+    ///
+    /// ```
+    /// use ratelab::{Cost, RateLimitConfig, RateLimiter, LeakyBucket};
+    ///
+    /// let limiter = LeakyBucket::new(RateLimitConfig::per_minute(100)?);
+    /// assert!(limiter.check("k", Cost::ONE).allowed);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn new(config: RateLimitConfig) -> Self {
         Self::with_clock(config, crate::MonotonicClock::new())
     }

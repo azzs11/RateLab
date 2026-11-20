@@ -11,7 +11,7 @@ repository = "https://github.com/azzs11/distributed-rate-limiter"
 
 [workspace.dependencies]
 # Default features off here; crates that need the real clock enable "std-clock".
-ratelab = { path = "crates/core", default-features = false }
+ratelab = { path = "crates/core", version = "0.1.0", default-features = false }
 drl-redis-store = { path = "crates/redis-store" }
 thiserror = "2.0"
 

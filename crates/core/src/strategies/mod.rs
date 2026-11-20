@@ -115,6 +115,17 @@ pub struct Outbox {
 
 impl Outbox {
     /// Empties the outbox, keeping its allocations.
+    ///
+    /// ```
+    /// use ratelab::strategies::Outbox;
+    /// use ratelab::{Decision, Tokens};
+    /// use std::time::Duration;
+    ///
+    /// let mut out = Outbox::default();
+    /// out.decisions.push((1, Decision::allow(Tokens(0), Duration::ZERO)));
+    /// out.clear();
+    /// assert!(out.decisions.is_empty() && out.messages.is_empty());
+    /// ```
     pub fn clear(&mut self) {
         self.decisions.clear();
         self.messages.clear();

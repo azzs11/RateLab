@@ -37,6 +37,17 @@ impl CentralExact {
     /// A node that sends every request to the store. With `node_clock`, it sends its
     /// own time (as an application-clock script would) instead of letting the store use
     /// its clock.
+    ///
+    /// ```
+    /// use ratelab::strategies::{CentralExact, CoordinationStrategy, Outbox};
+    /// use ratelab::{Cost, FailurePolicy, Nanos};
+    ///
+    /// let mut node = CentralExact::new(FailurePolicy::FailOpen, false);
+    /// let mut out = Outbox::default();
+    /// node.on_request(Nanos::ZERO, 1, "k", Cost::ONE, &mut out);
+    /// assert_eq!(out.messages.len(), 1, "every request asks the store");
+    /// assert!(out.decisions.is_empty());
+    /// ```
     pub fn new(policy: FailurePolicy, node_clock: bool) -> Self {
         Self {
             policy,

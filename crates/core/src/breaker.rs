@@ -62,11 +62,28 @@ impl BreakerConfig {
     }
 
     /// Consecutive failures that open the breaker.
+    ///
+    /// ```
+    /// use ratelab::BreakerConfig;
+    /// use std::time::Duration;
+    ///
+    /// assert_eq!(BreakerConfig::new(3, Duration::from_secs(1))?.failure_threshold(), 3);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn failure_threshold(&self) -> u32 {
         self.failure_threshold
     }
 
     /// How long the breaker stays open before it lets a probe through.
+    ///
+    /// ```
+    /// use ratelab::BreakerConfig;
+    /// use std::time::Duration;
+    ///
+    /// let c = BreakerConfig::new(3, Duration::from_millis(500))?;
+    /// assert_eq!(c.open_for(), Duration::from_millis(500));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn open_for(&self) -> Duration {
         self.open_for
     }
@@ -143,6 +160,16 @@ pub struct CircuitBreaker<C> {
 
 impl<C: Clock> CircuitBreaker<C> {
     /// A closed breaker that reads time from `clock`.
+    ///
+    /// ```
+    /// use ratelab::{BreakerConfig, BreakerState, CircuitBreaker, ManualClock};
+    /// use std::time::Duration;
+    ///
+    /// let clock = ManualClock::new();
+    /// let breaker = CircuitBreaker::new(BreakerConfig::new(2, Duration::from_secs(1))?, &clock);
+    /// assert_eq!(breaker.state(), BreakerState::Closed);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn new(config: BreakerConfig, clock: C) -> Self {
         Self {
             config,
@@ -164,6 +191,21 @@ impl<C: Clock> CircuitBreaker<C> {
     ///
     /// [`record_success`]: Self::record_success
     /// [`record_failure`]: Self::record_failure
+    ///
+    /// ```
+    /// use ratelab::{BreakerConfig, BreakerState, CircuitBreaker, ManualClock};
+    /// use std::time::Duration;
+    ///
+    /// let clock = ManualClock::new();
+    /// let breaker = CircuitBreaker::new(BreakerConfig::new(2, Duration::from_secs(1))?, &clock);
+    /// breaker.record_failure();
+    /// breaker.record_failure();
+    /// assert!(breaker.acquire().is_err()); // open: do not call the backend
+    /// clock.advance(Duration::from_secs(1));
+    /// assert!(breaker.acquire().is_ok()); // one probe may go
+    /// assert_eq!(breaker.state(), BreakerState::HalfOpen);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn acquire(&self) -> Result<(), Rejected> {
         let now = self.clock.now();
         let mut inner = self.lock();
@@ -189,12 +231,38 @@ impl<C: Clock> CircuitBreaker<C> {
     }
 
     /// Reports a successful backend call. Closes the breaker.
+    ///
+    /// ```
+    /// use ratelab::{BreakerConfig, BreakerState, CircuitBreaker, ManualClock};
+    /// use std::time::Duration;
+    ///
+    /// let clock = ManualClock::new();
+    /// let breaker = CircuitBreaker::new(BreakerConfig::new(2, Duration::from_secs(1))?, &clock);
+    /// breaker.record_failure();
+    /// breaker.record_success(); // the count starts again
+    /// breaker.record_failure();
+    /// assert_eq!(breaker.state(), BreakerState::Closed);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn record_success(&self) {
         *self.lock() = Inner::Closed { failures: 0 };
     }
 
     /// Reports a failed backend call. Opens the breaker after `failure_threshold`
     /// consecutive failures, or straight away if the failed call was the half-open probe.
+    ///
+    /// ```
+    /// use ratelab::{BreakerConfig, BreakerState, CircuitBreaker, ManualClock};
+    /// use std::time::Duration;
+    ///
+    /// let clock = ManualClock::new();
+    /// let breaker = CircuitBreaker::new(BreakerConfig::new(2, Duration::from_secs(1))?, &clock);
+    /// breaker.record_failure();
+    /// assert_eq!(breaker.state(), BreakerState::Closed);
+    /// breaker.record_failure();
+    /// assert_eq!(breaker.state(), BreakerState::Open);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn record_failure(&self) {
         let now = self.clock.now();
         let open = Inner::Open {
@@ -218,6 +286,16 @@ impl<C: Clock> CircuitBreaker<C> {
 
     /// The current state. An open breaker whose `open_for` has passed still reports
     /// `Open` until the next [`acquire`](Self::acquire) turns it half-open.
+    ///
+    /// ```
+    /// use ratelab::{BreakerConfig, BreakerState, CircuitBreaker, ManualClock};
+    /// use std::time::Duration;
+    ///
+    /// let clock = ManualClock::new();
+    /// let breaker = CircuitBreaker::new(BreakerConfig::new(2, Duration::from_secs(1))?, &clock);
+    /// assert_eq!(breaker.state(), BreakerState::Closed);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn state(&self) -> BreakerState {
         match *self.lock() {
             Inner::Closed { .. } => BreakerState::Closed,
@@ -227,6 +305,16 @@ impl<C: Clock> CircuitBreaker<C> {
     }
 
     /// The configuration this breaker was built with.
+    ///
+    /// ```
+    /// use ratelab::{BreakerConfig, BreakerState, CircuitBreaker, ManualClock};
+    /// use std::time::Duration;
+    ///
+    /// let clock = ManualClock::new();
+    /// let breaker = CircuitBreaker::new(BreakerConfig::new(2, Duration::from_secs(1))?, &clock);
+    /// assert_eq!(breaker.config().failure_threshold(), 2);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn config(&self) -> BreakerConfig {
         self.config
     }

@@ -44,6 +44,16 @@ pub struct SlidingWindow<C> {
 
 impl<C: Clock> SlidingWindow<C> {
     /// A sliding window log that reads time from `clock`.
+    ///
+    /// ```
+    /// use ratelab::{Cost, ManualClock, RateLimitConfig, RateLimiter, SlidingWindow};
+    ///
+    /// let clock = ManualClock::new();
+    /// let limiter = SlidingWindow::with_clock(RateLimitConfig::per_second(1)?, &clock);
+    /// assert!(limiter.check("k", Cost::ONE).allowed);
+    /// assert!(!limiter.check("k", Cost::ONE).allowed);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn with_clock(config: RateLimitConfig, clock: C) -> Self {
         Self {
             limit: config.limit(),
@@ -65,6 +75,14 @@ impl<C: Clock> SlidingWindow<C> {
 #[cfg(feature = "std-clock")]
 impl SlidingWindow<crate::MonotonicClock> {
     /// A sliding window log on the real monotonic clock.
+    ///
+    /// ```
+    /// use ratelab::{Cost, RateLimitConfig, RateLimiter, SlidingWindow};
+    ///
+    /// let limiter = SlidingWindow::new(RateLimitConfig::per_minute(100)?);
+    /// assert!(limiter.check("k", Cost::ONE).allowed);
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn new(config: RateLimitConfig) -> Self {
         Self::with_clock(config, crate::MonotonicClock::new())
     }

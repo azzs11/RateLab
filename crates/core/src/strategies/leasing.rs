@@ -358,6 +358,16 @@ pub struct FixedLeasing(Leasing);
 
 impl FixedLeasing {
     /// Leases of `chunk` tokens that expire after `ttl`.
+    ///
+    /// ```
+    /// use ratelab::strategies::{CoordinationStrategy, FixedLeasing};
+    /// use ratelab::{FailurePolicy, RateLimitConfig};
+    /// use std::time::Duration;
+    ///
+    /// let node = FixedLeasing::new(RateLimitConfig::per_second(100)?, 10, Duration::from_secs(1), FailurePolicy::FailOpen);
+    /// assert_eq!(node.name(), "fixed_leasing");
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn new(config: RateLimitConfig, chunk: u64, ttl: Duration, policy: FailurePolicy) -> Self {
         Self(Leasing::new(config, Sizing::Fixed { chunk, ttl }, policy))
     }
@@ -396,6 +406,16 @@ pub struct AdaptiveLeasing(Leasing);
 
 impl AdaptiveLeasing {
     /// Adaptive leases sized by `params`.
+    ///
+    /// ```
+    /// use ratelab::strategies::{AdaptiveLeasing, AdaptiveParams, CoordinationStrategy};
+    /// use ratelab::{FailurePolicy, RateLimitConfig};
+    ///
+    /// let config = RateLimitConfig::per_second(100)?;
+    /// let node = AdaptiveLeasing::new(config, AdaptiveParams::for_cluster(config, 3), FailurePolicy::FailOpen);
+    /// assert_eq!(node.name(), "adaptive_leasing");
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn new(config: RateLimitConfig, params: AdaptiveParams, policy: FailurePolicy) -> Self {
         Self(Leasing::new(config, Sizing::Adaptive(params), policy))
     }

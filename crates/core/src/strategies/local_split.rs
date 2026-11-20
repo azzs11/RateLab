@@ -31,6 +31,18 @@ pub struct LocalSplit {
 
 impl LocalSplit {
     /// One node's `1 / nodes` share of `config`.
+    ///
+    /// ```
+    /// use ratelab::strategies::{CoordinationStrategy, LocalSplit, Outbox};
+    /// use ratelab::{Cost, Nanos, RateLimitConfig};
+    ///
+    /// let mut node = LocalSplit::new(RateLimitConfig::per_second(90)?, 3);
+    /// let mut out = Outbox::default();
+    /// node.on_request(Nanos::ZERO, 1, "k", Cost::ONE, &mut out);
+    /// assert!(out.decisions[0].1.allowed);
+    /// assert!(out.messages.is_empty(), "never talks to the store");
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn new(config: RateLimitConfig, nodes: u64) -> Self {
         Self {
             config,

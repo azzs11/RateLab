@@ -60,6 +60,17 @@ pub struct AsyncSync {
 
 impl AsyncSync {
     /// A node of a `nodes`-node cluster that syncs every `interval`.
+    ///
+    /// ```
+    /// use ratelab::strategies::{AsyncSync, CoordinationStrategy};
+    /// use ratelab::RateLimitConfig;
+    /// use std::time::Duration;
+    ///
+    /// let node = AsyncSync::new(RateLimitConfig::per_second(100)?, 2, Duration::from_millis(50));
+    /// assert_eq!(node.name(), "async_sync");
+    /// assert_eq!(node.tick_every(), Some(Duration::from_millis(50)));
+    /// # Ok::<(), ratelab::ConfigError>(())
+    /// ```
     pub fn new(config: RateLimitConfig, nodes: u64, interval: Duration) -> Self {
         Self {
             config,
