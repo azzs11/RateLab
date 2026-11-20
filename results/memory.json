@@ -1,0 +1,50 @@
+{
+  "machine": {
+    "cpu": "Apple M5",
+    "logical_cpus": 10,
+    "memory_bytes": 17179869184,
+    "os": "macOS 27.0",
+    "arch": "aarch64",
+    "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+    "profile": "release",
+    "git_commit": "d47ebdde8de9",
+    "measured_at": "2026-11-20T07:06:41Z"
+  },
+  "rows": [
+    {
+      "algorithm": "token_bucket",
+      "keys": 100000,
+      "limit": 100,
+      "bytes_per_key_one_request": 96.28464,
+      "bytes_per_key_full_window": 96.28464
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "keys": 100000,
+      "limit": 100,
+      "bytes_per_key_one_request": 96.28464,
+      "bytes_per_key_full_window": 96.28464
+    },
+    {
+      "algorithm": "fixed_window",
+      "keys": 100000,
+      "limit": 100,
+      "bytes_per_key_one_request": 64.8272,
+      "bytes_per_key_full_window": 64.8272
+    },
+    {
+      "algorithm": "sliding_window",
+      "keys": 100000,
+      "limit": 100,
+      "bytes_per_key_one_request": 160.28448,
+      "bytes_per_key_full_window": 2144.28448
+    },
+    {
+      "algorithm": "gcra",
+      "keys": 100000,
+      "limit": 100,
+      "bytes_per_key_one_request": 75.31312,
+      "bytes_per_key_full_window": 75.31312
+    }
+  ]
+}

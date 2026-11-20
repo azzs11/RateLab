@@ -1,0 +1,2245 @@
+{
+  "schema": 1,
+  "machine": {
+    "cpu": "Apple M5",
+    "logical_cpus": 10,
+    "memory_bytes": 17179869184,
+    "os": "macOS 27.0",
+    "arch": "aarch64",
+    "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+    "profile": "release",
+    "git_commit": "d47ebdde8de9",
+    "measured_at": "2026-11-20T07:06:06Z"
+  },
+  "size": {
+    "name": "full",
+    "scenario_secs": 30,
+    "seeds": 5,
+    "latency_samples": 20000,
+    "runs": 5,
+    "checks_per_thread": 200000,
+    "threads": [
+      1,
+      4,
+      8,
+      16
+    ],
+    "keys": [
+      1,
+      1000,
+      1000000
+    ]
+  },
+  "timer": {
+    "resolution_ns": 41,
+    "overhead_ns": 0
+  },
+  "accuracy": [
+    {
+      "algorithm": "token_bucket",
+      "scenario": "steady_poisson",
+      "requests": {
+        "n": 5,
+        "mean": 59946.8,
+        "min": 59579.0,
+        "max": 60112.0,
+        "stddev": 213.58768691102023
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 20.968227834059764,
+        "min": 20.863225527240044,
+        "max": 21.151748099162457,
+        "stddev": 0.11636940345984594
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 19.082490022754428,
+        "min": 18.99062869317709,
+        "max": 19.221537790160962,
+        "stddev": 0.09796756411085775
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 3.786416371872383,
+        "min": 3.7432617939531925,
+        "max": 3.8547916736499848,
+        "stddev": 0.04161600905751657
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.9899999999999998,
+        "min": 1.99,
+        "max": 1.99,
+        "stddev": 2.482534153247273e-16
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "scenario": "steady_poisson",
+      "requests": {
+        "n": 5,
+        "mean": 59946.8,
+        "min": 59579.0,
+        "max": 60112.0,
+        "stddev": 213.58768691102023
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 20.968227834059764,
+        "min": 20.863225527240044,
+        "max": 21.151748099162457,
+        "stddev": 0.11636940345984594
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 19.082490022754428,
+        "min": 18.99062869317709,
+        "max": 19.221537790160962,
+        "stddev": 0.09796756411085775
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 3.786416371872383,
+        "min": 3.7432617939531925,
+        "max": 3.8547916736499848,
+        "stddev": 0.04161600905751657
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.9899999999999998,
+        "min": 1.99,
+        "max": 1.99,
+        "stddev": 2.482534153247273e-16
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "scenario": "steady_poisson",
+      "requests": {
+        "n": 5,
+        "mean": 59946.8,
+        "min": 59579.0,
+        "max": 60112.0,
+        "stddev": 213.58768691102023
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 23.807640649140843,
+        "min": 23.36489099273285,
+        "max": 24.008671002167752,
+        "stddev": 0.26653385109574895
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 23.564372170608223,
+        "min": 23.12487499166611,
+        "max": 23.78689344672336,
+        "stddev": 0.27397698095178674
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 0.4883888069745207,
+        "min": 0.4453075300498878,
+        "max": 0.5597827908691717,
+        "stddev": 0.0438632149012198
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.37,
+        "min": 1.33,
+        "max": 1.4,
+        "stddev": 0.02738612787525823
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "scenario": "steady_poisson",
+      "requests": {
+        "n": 5,
+        "mean": 59946.8,
+        "min": 59579.0,
+        "max": 60112.0,
+        "stddev": 213.58768691102023
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.0,
+        "min": 1.0,
+        "max": 1.0,
+        "stddev": 0.0
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "scenario": "steady_poisson",
+      "requests": {
+        "n": 5,
+        "mean": 59946.8,
+        "min": 59579.0,
+        "max": 60112.0,
+        "stddev": 213.58768691102023
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 20.968227834059764,
+        "min": 20.863225527240044,
+        "max": 21.151748099162457,
+        "stddev": 0.11636940345984594
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 19.082490022754428,
+        "min": 18.99062869317709,
+        "max": 19.221537790160962,
+        "stddev": 0.09796756411085775
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 3.786416371872383,
+        "min": 3.7432617939531925,
+        "max": 3.8547916736499848,
+        "stddev": 0.04161600905751657
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.9899999999999998,
+        "min": 1.99,
+        "max": 1.99,
+        "stddev": 2.482534153247273e-16
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "scenario": "on_off",
+      "requests": {
+        "n": 5,
+        "mean": 59957.2,
+        "min": 59591.0,
+        "max": 60121.0,
+        "stddev": 213.4190713127578
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 24.74522820107444,
+        "min": 24.67357495716971,
+        "max": 24.88966454665973,
+        "stddev": 0.08561542278915969
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 98.90933333333332,
+        "min": 98.88,
+        "max": 98.93333333333334,
+        "stddev": 0.02241031508529729
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.9899999999999998,
+        "min": 1.99,
+        "max": 1.99,
+        "stddev": 2.482534153247273e-16
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "scenario": "on_off",
+      "requests": {
+        "n": 5,
+        "mean": 59957.2,
+        "min": 59591.0,
+        "max": 60121.0,
+        "stddev": 213.4190713127578
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 24.74522820107444,
+        "min": 24.67357495716971,
+        "max": 24.88966454665973,
+        "stddev": 0.08561542278915969
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 98.90933333333332,
+        "min": 98.88,
+        "max": 98.93333333333334,
+        "stddev": 0.02241031508529729
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.9899999999999998,
+        "min": 1.99,
+        "max": 1.99,
+        "stddev": 2.482534153247273e-16
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "scenario": "on_off",
+      "requests": {
+        "n": 5,
+        "mean": 59957.2,
+        "min": 59591.0,
+        "max": 60121.0,
+        "stddev": 213.4190713127578
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.0,
+        "min": 1.0,
+        "max": 1.0,
+        "stddev": 0.0
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "scenario": "on_off",
+      "requests": {
+        "n": 5,
+        "mean": 59957.2,
+        "min": 59591.0,
+        "max": 60121.0,
+        "stddev": 213.4190713127578
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.0,
+        "min": 1.0,
+        "max": 1.0,
+        "stddev": 0.0
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "scenario": "on_off",
+      "requests": {
+        "n": 5,
+        "mean": 59957.2,
+        "min": 59591.0,
+        "max": 60121.0,
+        "stddev": 213.4190713127578
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 24.74522820107444,
+        "min": 24.67357495716971,
+        "max": 24.88966454665973,
+        "stddev": 0.08561542278915969
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 98.90933333333332,
+        "min": 98.88,
+        "max": 98.93333333333334,
+        "stddev": 0.02241031508529729
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.9899999999999998,
+        "min": 1.99,
+        "max": 1.99,
+        "stddev": 2.482534153247273e-16
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "scenario": "heavy_tailed",
+      "requests": {
+        "n": 5,
+        "mean": 59966.8,
+        "min": 59767.0,
+        "max": 60079.0,
+        "stddev": 119.24848007417118
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 21.188675417550904,
+        "min": 21.025512756378188,
+        "max": 21.298039281014177,
+        "stddev": 0.11187128924846083
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 19.21692282931033,
+        "min": 19.07620476905119,
+        "max": 19.301872009868475,
+        "stddev": 0.09113556366813022
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 3.9680817217482653,
+        "min": 3.9209767223452068,
+        "max": 4.051058112193483,
+        "stddev": 0.056500307892473456
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.9899999999999998,
+        "min": 1.99,
+        "max": 1.99,
+        "stddev": 2.482534153247273e-16
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "scenario": "heavy_tailed",
+      "requests": {
+        "n": 5,
+        "mean": 59966.8,
+        "min": 59767.0,
+        "max": 60079.0,
+        "stddev": 119.24848007417118
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 21.188675417550904,
+        "min": 21.025512756378188,
+        "max": 21.298039281014177,
+        "stddev": 0.11187128924846083
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 19.21692282931033,
+        "min": 19.07620476905119,
+        "max": 19.301872009868475,
+        "stddev": 0.09113556366813022
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 3.9680817217482653,
+        "min": 3.9209767223452068,
+        "max": 4.051058112193483,
+        "stddev": 0.056500307892473456
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.9899999999999998,
+        "min": 1.99,
+        "max": 1.99,
+        "stddev": 2.482534153247273e-16
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "scenario": "heavy_tailed",
+      "requests": {
+        "n": 5,
+        "mean": 59966.8,
+        "min": 59767.0,
+        "max": 60079.0,
+        "stddev": 119.24848007417118
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 23.99304513247744,
+        "min": 23.419293537148477,
+        "max": 25.429375801695848,
+        "stddev": 0.828784183769138
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 23.6562033092937,
+        "min": 23.059227525046257,
+        "max": 25.046227656632627,
+        "stddev": 0.8069589048505452
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 0.6779339594540065,
+        "min": 0.6238679814852083,
+        "max": 0.7725898555592878,
+        "stddev": 0.067426518933178
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.408,
+        "min": 1.38,
+        "max": 1.49,
+        "stddev": 0.046583258795408505
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "scenario": "heavy_tailed",
+      "requests": {
+        "n": 5,
+        "mean": 59966.8,
+        "min": 59767.0,
+        "max": 60079.0,
+        "stddev": 119.24848007417118
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.0,
+        "min": 1.0,
+        "max": 1.0,
+        "stddev": 0.0
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "scenario": "heavy_tailed",
+      "requests": {
+        "n": 5,
+        "mean": 59966.8,
+        "min": 59767.0,
+        "max": 60079.0,
+        "stddev": 119.24848007417118
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 21.188675417550904,
+        "min": 21.025512756378188,
+        "max": 21.298039281014177,
+        "stddev": 0.11187128924846083
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 19.21692282931033,
+        "min": 19.07620476905119,
+        "max": 19.301872009868475,
+        "stddev": 0.09113556366813022
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 3.9680817217482653,
+        "min": 3.9209767223452068,
+        "max": 4.051058112193483,
+        "stddev": 0.056500307892473456
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.9899999999999998,
+        "min": 1.99,
+        "max": 1.99,
+        "stddev": 2.482534153247273e-16
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "scenario": "diurnal",
+      "requests": {
+        "n": 5,
+        "mean": 67460.4,
+        "min": 67108.0,
+        "max": 67692.0,
+        "stddev": 218.38681278868467
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 16.41096799419347,
+        "min": 16.309859154929576,
+        "max": 16.516659712701912,
+        "stddev": 0.09623342477965448
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 14.642785979826527,
+        "min": 14.515937731653077,
+        "max": 14.735948024080587,
+        "stddev": 0.0937454290238552
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 4.173499359214814,
+        "min": 4.093894089702389,
+        "max": 4.244422618212432,
+        "stddev": 0.05565905614800891
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.72,
+        "min": 1.7,
+        "max": 1.75,
+        "stddev": 0.021213203435596444
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "scenario": "diurnal",
+      "requests": {
+        "n": 5,
+        "mean": 67460.4,
+        "min": 67108.0,
+        "max": 67692.0,
+        "stddev": 218.38681278868467
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 16.41096799419347,
+        "min": 16.309859154929576,
+        "max": 16.516659712701912,
+        "stddev": 0.09623342477965448
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 14.642785979826527,
+        "min": 14.515937731653077,
+        "max": 14.735948024080587,
+        "stddev": 0.0937454290238552
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 4.173499359214814,
+        "min": 4.093894089702389,
+        "max": 4.244422618212432,
+        "stddev": 0.05565905614800891
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.72,
+        "min": 1.7,
+        "max": 1.75,
+        "stddev": 0.021213203435596444
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "scenario": "diurnal",
+      "requests": {
+        "n": 5,
+        "mean": 67460.4,
+        "min": 67108.0,
+        "max": 67692.0,
+        "stddev": 218.38681278868467
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 20.79602039847617,
+        "min": 20.292428816669627,
+        "max": 21.37599093997735,
+        "stddev": 0.391903026425327
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 20.332673449147173,
+        "min": 19.860297164506008,
+        "max": 20.955772784168804,
+        "stddev": 0.4032106288817223
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 1.0938308456850736,
+        "min": 0.985945038808475,
+        "max": 1.2078986065401582,
+        "stddev": 0.09304163954871224
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.404,
+        "min": 1.36,
+        "max": 1.5,
+        "stddev": 0.05594640292279743
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "scenario": "diurnal",
+      "requests": {
+        "n": 5,
+        "mean": 67460.4,
+        "min": 67108.0,
+        "max": 67692.0,
+        "stddev": 218.38681278868467
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.0,
+        "min": 1.0,
+        "max": 1.0,
+        "stddev": 0.0
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "scenario": "diurnal",
+      "requests": {
+        "n": 5,
+        "mean": 67460.4,
+        "min": 67108.0,
+        "max": 67692.0,
+        "stddev": 218.38681278868467
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 16.41096799419347,
+        "min": 16.309859154929576,
+        "max": 16.516659712701912,
+        "stddev": 0.09623342477965448
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 14.642785979826527,
+        "min": 14.515937731653077,
+        "max": 14.735948024080587,
+        "stddev": 0.0937454290238552
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 4.173499359214814,
+        "min": 4.093894089702389,
+        "max": 4.244422618212432,
+        "stddev": 0.05565905614800891
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.72,
+        "min": 1.7,
+        "max": 1.75,
+        "stddev": 0.021213203435596444
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "scenario": "flash_crowd",
+      "requests": {
+        "n": 5,
+        "mean": 119919.4,
+        "min": 119499.0,
+        "max": 120428.0,
+        "stddev": 352.6744958173188
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 7.236707712512342,
+        "min": 6.9515226068837395,
+        "max": 7.521506626365961,
+        "stddev": 0.2214275405863721
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 0.015189862695092824,
+        "min": 0.0,
+        "max": 0.0250077107108025,
+        "stddev": 0.009858690347773086
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 7.786354764348751,
+        "min": 7.458578444600356,
+        "max": 8.133249528598366,
+        "stddev": 0.26276931670237974
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.4179999999999997,
+        "min": 1.38,
+        "max": 1.47,
+        "stddev": 0.03346640106136305
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "scenario": "flash_crowd",
+      "requests": {
+        "n": 5,
+        "mean": 119919.4,
+        "min": 119499.0,
+        "max": 120428.0,
+        "stddev": 352.6744958173188
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 7.236707712512342,
+        "min": 6.9515226068837395,
+        "max": 7.521506626365961,
+        "stddev": 0.2214275405863721
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 0.015189862695092824,
+        "min": 0.0,
+        "max": 0.0250077107108025,
+        "stddev": 0.009858690347773086
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 7.786354764348751,
+        "min": 7.458578444600356,
+        "max": 8.133249528598366,
+        "stddev": 0.26276931670237974
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.4179999999999997,
+        "min": 1.38,
+        "max": 1.47,
+        "stddev": 0.03346640106136305
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "scenario": "flash_crowd",
+      "requests": {
+        "n": 5,
+        "mean": 119919.4,
+        "min": 119499.0,
+        "max": 120428.0,
+        "stddev": 352.6744958173188
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 6.253654553247978,
+        "min": 6.029339157649855,
+        "max": 6.461952369880759,
+        "stddev": 0.18523085275959544
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 2.9654549124957676,
+        "min": 2.797529238181773,
+        "max": 3.1039293187630785,
+        "stddev": 0.14442713517013797
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 3.5453062805497533,
+        "min": 3.4213653056815727,
+        "max": 3.6311394450929333,
+        "stddev": 0.10412999224379943
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.326,
+        "min": 1.29,
+        "max": 1.35,
+        "stddev": 0.023021728866442694
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "scenario": "flash_crowd",
+      "requests": {
+        "n": 5,
+        "mean": 119919.4,
+        "min": 119499.0,
+        "max": 120428.0,
+        "stddev": 352.6744958173188
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.0,
+        "min": 1.0,
+        "max": 1.0,
+        "stddev": 0.0
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "scenario": "flash_crowd",
+      "requests": {
+        "n": 5,
+        "mean": 119919.4,
+        "min": 119499.0,
+        "max": 120428.0,
+        "stddev": 352.6744958173188
+      },
+      "over_pct": {
+        "n": 5,
+        "mean": 7.236707712512342,
+        "min": 6.9515226068837395,
+        "max": 7.521506626365961,
+        "stddev": 0.2214275405863721
+      },
+      "under_pct": {
+        "n": 5,
+        "mean": 0.015189862695092824,
+        "min": 0.0,
+        "max": 0.0250077107108025,
+        "stddev": 0.009858690347773086
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 5,
+        "mean": 7.786354764348751,
+        "min": 7.458578444600356,
+        "max": 8.133249528598366,
+        "stddev": 0.26276931670237974
+      },
+      "worst_window_ratio": {
+        "n": 5,
+        "mean": 1.4179999999999997,
+        "min": 1.38,
+        "max": 1.47,
+        "stddev": 0.03346640106136305
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "scenario": "boundary_attack",
+      "requests": {
+        "n": 1,
+        "mean": 200.0,
+        "min": 200.0,
+        "max": 200.0,
+        "stddev": 0.0
+      },
+      "over_pct": {
+        "n": 1,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "under_pct": {
+        "n": 1,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 1,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "worst_window_ratio": {
+        "n": 1,
+        "mean": 1.0,
+        "min": 1.0,
+        "max": 1.0,
+        "stddev": 0.0
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "scenario": "boundary_attack",
+      "requests": {
+        "n": 1,
+        "mean": 200.0,
+        "min": 200.0,
+        "max": 200.0,
+        "stddev": 0.0
+      },
+      "over_pct": {
+        "n": 1,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "under_pct": {
+        "n": 1,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 1,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "worst_window_ratio": {
+        "n": 1,
+        "mean": 1.0,
+        "min": 1.0,
+        "max": 1.0,
+        "stddev": 0.0
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "scenario": "boundary_attack",
+      "requests": {
+        "n": 1,
+        "mean": 200.0,
+        "min": 200.0,
+        "max": 200.0,
+        "stddev": 0.0
+      },
+      "over_pct": {
+        "n": 1,
+        "mean": 50.0,
+        "min": 50.0,
+        "max": 50.0,
+        "stddev": 0.0
+      },
+      "under_pct": {
+        "n": 1,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 1,
+        "mean": 100.0,
+        "min": 100.0,
+        "max": 100.0,
+        "stddev": 0.0
+      },
+      "worst_window_ratio": {
+        "n": 1,
+        "mean": 2.0,
+        "min": 2.0,
+        "max": 2.0,
+        "stddev": 0.0
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "scenario": "boundary_attack",
+      "requests": {
+        "n": 1,
+        "mean": 200.0,
+        "min": 200.0,
+        "max": 200.0,
+        "stddev": 0.0
+      },
+      "over_pct": {
+        "n": 1,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "under_pct": {
+        "n": 1,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 1,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "worst_window_ratio": {
+        "n": 1,
+        "mean": 1.0,
+        "min": 1.0,
+        "max": 1.0,
+        "stddev": 0.0
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "scenario": "boundary_attack",
+      "requests": {
+        "n": 1,
+        "mean": 200.0,
+        "min": 200.0,
+        "max": 200.0,
+        "stddev": 0.0
+      },
+      "over_pct": {
+        "n": 1,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "under_pct": {
+        "n": 1,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "admitted_vs_oracle_pct": {
+        "n": 1,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "stddev": 0.0
+      },
+      "worst_window_ratio": {
+        "n": 1,
+        "mean": 1.0,
+        "min": 1.0,
+        "max": 1.0,
+        "stddev": 0.0
+      }
+    }
+  ],
+  "latency": [
+    {
+      "algorithm": "token_bucket",
+      "keys": 1000,
+      "batch": 100,
+      "p50_ns": {
+        "n": 5,
+        "mean": 44.998,
+        "min": 38.75,
+        "max": 47.92,
+        "stddev": 3.9740495719102444
+      },
+      "p99_ns": {
+        "n": 5,
+        "mean": 53.168000000000006,
+        "min": 51.67,
+        "max": 55.0,
+        "stddev": 1.5167630006035866
+      },
+      "p999_ns": {
+        "n": 5,
+        "mean": 130.584,
+        "min": 117.5,
+        "max": 140.0,
+        "stddev": 8.671898869336518
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "keys": 1000,
+      "batch": 100,
+      "p50_ns": {
+        "n": 5,
+        "mean": 45.25,
+        "min": 38.75,
+        "max": 47.5,
+        "stddev": 3.663256747758748
+      },
+      "p99_ns": {
+        "n": 5,
+        "mean": 52.831999999999994,
+        "min": 49.58,
+        "max": 56.25,
+        "stddev": 2.438066857163684
+      },
+      "p999_ns": {
+        "n": 5,
+        "mean": 124.58200000000002,
+        "min": 113.33,
+        "max": 137.5,
+        "stddev": 9.3450452112336
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "keys": 1000,
+      "batch": 100,
+      "p50_ns": {
+        "n": 5,
+        "mean": 37.666,
+        "min": 37.5,
+        "max": 38.33,
+        "stddev": 0.3711872842649643
+      },
+      "p99_ns": {
+        "n": 5,
+        "mean": 55.0,
+        "min": 47.92,
+        "max": 80.83,
+        "stddev": 14.443881057388971
+      },
+      "p999_ns": {
+        "n": 5,
+        "mean": 153.67,
+        "min": 114.59,
+        "max": 270.84,
+        "stddev": 65.81879594766224
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "keys": 1000,
+      "batch": 100,
+      "p50_ns": {
+        "n": 5,
+        "mean": 54.5,
+        "min": 47.08,
+        "max": 57.09,
+        "stddev": 4.193417460735338
+      },
+      "p99_ns": {
+        "n": 5,
+        "mean": 73.75,
+        "min": 67.92,
+        "max": 80.0,
+        "stddev": 4.629465411902328
+      },
+      "p999_ns": {
+        "n": 5,
+        "mean": 146.49999999999997,
+        "min": 139.17,
+        "max": 152.92,
+        "stddev": 6.497757305409306
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "keys": 1000,
+      "batch": 100,
+      "p50_ns": {
+        "n": 5,
+        "mean": 45.834,
+        "min": 37.5,
+        "max": 48.33,
+        "stddev": 4.668080976161404
+      },
+      "p99_ns": {
+        "n": 5,
+        "mean": 52.668000000000006,
+        "min": 51.66,
+        "max": 54.17,
+        "stddev": 1.0894815280673662
+      },
+      "p999_ns": {
+        "n": 5,
+        "mean": 126.08400000000002,
+        "min": 114.58,
+        "max": 133.75,
+        "stddev": 8.190459694058694
+      }
+    }
+  ],
+  "throughput": [
+    {
+      "algorithm": "token_bucket",
+      "threads": 1,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 27034706.636505194,
+        "min": 25821308.027418613,
+        "max": 28736321.69047734,
+        "stddev": 1190560.2607748106
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "threads": 4,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 12051365.556842914,
+        "min": 11983866.83910652,
+        "max": 12143605.666036392,
+        "stddev": 63701.86288868964
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "threads": 8,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 10851232.080082864,
+        "min": 10759901.21065701,
+        "max": 10900169.442452723,
+        "stddev": 62334.90975204502
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "threads": 16,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 8348268.727035572,
+        "min": 8284435.745786911,
+        "max": 8438917.776095586,
+        "stddev": 58629.09549056501
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "threads": 1,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 23065918.72402018,
+        "min": 21088517.576330416,
+        "max": 26956750.05108304,
+        "stddev": 2445002.0033787224
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "threads": 4,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 12386211.778696919,
+        "min": 12241548.584051445,
+        "max": 12558557.610726878,
+        "stddev": 116105.17878134412
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "threads": 8,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 11250498.06433158,
+        "min": 11169849.78297331,
+        "max": 11438893.641073983,
+        "stddev": 107690.09724123347
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "threads": 16,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 8614153.382608116,
+        "min": 8419845.04853909,
+        "max": 8892261.575500116,
+        "stddev": 238636.055951865
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "threads": 1,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 29910648.206626274,
+        "min": 28283710.506040834,
+        "max": 32564894.09977851,
+        "stddev": 2151652.338339076
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "threads": 4,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 12048760.148855098,
+        "min": 11914483.910874536,
+        "max": 12180260.177056527,
+        "stddev": 99869.42760152303
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "threads": 8,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 8753999.048377145,
+        "min": 8706868.93978454,
+        "max": 8787173.306008592,
+        "stddev": 35866.18704679961
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "threads": 16,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 8177758.036249076,
+        "min": 8165771.114640108,
+        "max": 8197723.978790951,
+        "stddev": 12082.893514027273
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "threads": 1,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 29094492.236724723,
+        "min": 26285094.70848187,
+        "max": 36615511.13605848,
+        "stddev": 4473662.772487289
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "threads": 4,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 13215462.024659917,
+        "min": 13143825.00718844,
+        "max": 13300092.412367104,
+        "stddev": 56949.79535869634
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "threads": 8,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 9731839.669724707,
+        "min": 9204853.991052676,
+        "max": 10709839.242434703,
+        "stddev": 681901.0048359946
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "threads": 16,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 8324412.991528481,
+        "min": 8298951.576590084,
+        "max": 8356612.352716699,
+        "stddev": 24023.95563079961
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "threads": 1,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 26175409.73792693,
+        "min": 25122472.051249847,
+        "max": 27894325.694425754,
+        "stddev": 1069075.8276594619
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "threads": 4,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 12248487.394986361,
+        "min": 12060483.202656489,
+        "max": 12820666.915067088,
+        "stddev": 321376.27987495816
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "threads": 8,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 8408769.698206697,
+        "min": 8357455.29986304,
+        "max": 8455866.323323261,
+        "stddev": 36813.85806623669
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "threads": 16,
+      "keys": 1,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 8837214.730700705,
+        "min": 8815435.108416876,
+        "max": 8857935.325999701,
+        "stddev": 18483.896000100554
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "threads": 1,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 25022759.751857556,
+        "min": 22185042.555903256,
+        "max": 26530621.17867856,
+        "stddev": 1676410.1415584371
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "threads": 4,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 37441293.90265602,
+        "min": 34199055.34514349,
+        "max": 38951632.39474831,
+        "stddev": 1926368.7618954398
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "threads": 8,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 43527865.51806474,
+        "min": 43093580.40319431,
+        "max": 44054682.87511875,
+        "stddev": 351551.0966689191
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "threads": 16,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 50179243.968611546,
+        "min": 49857082.33643188,
+        "max": 50726787.251743294,
+        "stddev": 361634.1527149495
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "threads": 1,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 24204352.93520207,
+        "min": 20917858.91489862,
+        "max": 26433026.904063445,
+        "stddev": 2283325.5443202495
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "threads": 4,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 38357459.14321049,
+        "min": 37120458.39311661,
+        "max": 39774528.14358605,
+        "stddev": 968005.0524895841
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "threads": 8,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 43415562.371549174,
+        "min": 42603329.71648815,
+        "max": 44189333.285977095,
+        "stddev": 565235.9244167708
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "threads": 16,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 50075618.720770255,
+        "min": 49669902.365890756,
+        "max": 50468575.48912881,
+        "stddev": 358057.64037057845
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "threads": 1,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 27613360.68858687,
+        "min": 26319972.96412377,
+        "max": 31359636.228219755,
+        "stddev": 2161060.592458444
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "threads": 4,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 53010265.222049534,
+        "min": 52667094.58681019,
+        "max": 53910324.75714409,
+        "stddev": 514603.1044998553
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "threads": 8,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 66106157.756934986,
+        "min": 65079782.932892,
+        "max": 67590759.07590759,
+        "stddev": 1012091.3912496236
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "threads": 16,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 81514916.91711609,
+        "min": 79550622.51096667,
+        "max": 85988374.4255204,
+        "stddev": 2559910.568909095
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "threads": 1,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 22805536.523500126,
+        "min": 20460096.41820437,
+        "max": 25848977.349833596,
+        "stddev": 2528350.4667268787
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "threads": 4,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 55201413.644508526,
+        "min": 52290288.49075063,
+        "max": 58597502.47189902,
+        "stddev": 2585922.5900833686
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "threads": 8,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 64114271.998286545,
+        "min": 61723532.42850236,
+        "max": 66130275.7339045,
+        "stddev": 1845447.3214285302
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "threads": 16,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 74833208.34625074,
+        "min": 72766617.96836558,
+        "max": 76406734.53733633,
+        "stddev": 1383948.3365971313
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "threads": 1,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 25608296.987556957,
+        "min": 20688851.87423412,
+        "max": 28693717.094583243,
+        "stddev": 3417927.4810072742
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "threads": 4,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 49698548.903953955,
+        "min": 48433602.79771864,
+        "max": 51431373.70370437,
+        "stddev": 1344219.120933014
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "threads": 8,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 60387358.81633691,
+        "min": 59106748.52409526,
+        "max": 63129444.9540832,
+        "stddev": 1593956.6252556369
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "threads": 16,
+      "keys": 1000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 67713039.04831317,
+        "min": 66976082.21314091,
+        "max": 68182787.65583016,
+        "stddev": 470963.8335591487
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "threads": 1,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 4533070.546957706,
+        "min": 4476584.630940403,
+        "max": 4657350.026052052,
+        "stddev": 71876.7233209786
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "threads": 4,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 18111660.09369253,
+        "min": 16778083.628260583,
+        "max": 18568144.463506192,
+        "stddev": 750971.0972859878
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "threads": 8,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 24708439.970370375,
+        "min": 24400271.074811507,
+        "max": 24871915.85134454,
+        "stddev": 191787.53788589596
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "threads": 16,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 26117603.976265155,
+        "min": 25734979.96994235,
+        "max": 26526298.337961618,
+        "stddev": 328904.89527274657
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "threads": 1,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 5724844.5421159435,
+        "min": 5685795.815965003,
+        "max": 5751395.856585148,
+        "stddev": 25060.515448255133
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "threads": 4,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 18839938.65750067,
+        "min": 18691133.734547865,
+        "max": 18908543.55832365,
+        "stddev": 87824.24710760958
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "threads": 8,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 24639307.978159986,
+        "min": 24422789.13044842,
+        "max": 24882665.789469756,
+        "stddev": 194469.62757613428
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "threads": 16,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 26287987.83366707,
+        "min": 25753965.861251086,
+        "max": 26533520.13594847,
+        "stddev": 328920.00243767735
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "threads": 1,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 6301954.147044266,
+        "min": 6125292.865565135,
+        "max": 6417893.085923555,
+        "stddev": 114947.19825720126
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "threads": 4,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 19978751.079758845,
+        "min": 19654591.197032906,
+        "max": 20176884.186172817,
+        "stddev": 215429.79284092796
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "threads": 8,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 25977438.193204254,
+        "min": 25521037.90871045,
+        "max": 26282665.965795577,
+        "stddev": 299996.8824568964
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "threads": 16,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 27702307.986901034,
+        "min": 27073063.582629606,
+        "max": 28356916.096759114,
+        "stddev": 563210.3741464991
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "threads": 1,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 4814324.726904001,
+        "min": 4795233.576187138,
+        "max": 4841657.700320077,
+        "stddev": 21869.156404369805
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "threads": 4,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 13438185.134171825,
+        "min": 12969108.669312548,
+        "max": 14041790.333884286,
+        "stddev": 435774.4644849352
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "threads": 8,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 18963541.148385525,
+        "min": 18547086.82819858,
+        "max": 19208240.4119697,
+        "stddev": 296223.0566500053
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "threads": 16,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 19663307.12162306,
+        "min": 19579275.031453036,
+        "max": 19762494.95323005,
+        "stddev": 72332.57728312325
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "threads": 1,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 5710733.203219768,
+        "min": 5675838.717977875,
+        "max": 5754629.779489781,
+        "stddev": 30586.913527707085
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "threads": 4,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 18800782.02048673,
+        "min": 18700673.46735358,
+        "max": 18868870.19691435,
+        "stddev": 61920.22741414184
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "threads": 8,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 24090478.738221824,
+        "min": 23639847.04841661,
+        "max": 24577305.67231312,
+        "stddev": 383965.0642432686
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "threads": 16,
+      "keys": 1000000,
+      "decisions_per_sec": {
+        "n": 5,
+        "mean": 26173461.491670713,
+        "min": 25914288.490816623,
+        "max": 26416244.193874627,
+        "stddev": 204515.0186303015
+      }
+    }
+  ],
+  "fairness": [
+    {
+      "algorithm": "token_bucket",
+      "keying": "global",
+      "jain": {
+        "n": 5,
+        "mean": 0.33502950892933314,
+        "min": 0.3283738081927612,
+        "max": 0.3484558087995986,
+        "stddev": 0.007758166190876892
+      },
+      "noisy_share_pct": {
+        "n": 5,
+        "mean": 52.25895564720163,
+        "min": 51.01645692158761,
+        "max": 52.88802839625686,
+        "stddev": 0.7196309782098635
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "keying": "global",
+      "jain": {
+        "n": 5,
+        "mean": 0.33502950892933314,
+        "min": 0.3283738081927612,
+        "max": 0.3484558087995986,
+        "stddev": 0.007758166190876892
+      },
+      "noisy_share_pct": {
+        "n": 5,
+        "mean": 52.25895564720163,
+        "min": 51.01645692158761,
+        "max": 52.88802839625686,
+        "stddev": 0.7196309782098635
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "keying": "global",
+      "jain": {
+        "n": 5,
+        "mean": 0.32896884847416535,
+        "min": 0.31267653195866835,
+        "max": 0.33720873595431944,
+        "stddev": 0.009876792843735663
+      },
+      "noisy_share_pct": {
+        "n": 5,
+        "mean": 52.84666666666667,
+        "min": 52.03333333333333,
+        "max": 54.46666666666667,
+        "stddev": 0.9776957036260782
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "keying": "global",
+      "jain": {
+        "n": 5,
+        "mean": 0.32685620684050465,
+        "min": 0.310459162201804,
+        "max": 0.33656107873061125,
+        "stddev": 0.010990024637581315
+      },
+      "noisy_share_pct": {
+        "n": 5,
+        "mean": 53.06,
+        "min": 52.1,
+        "max": 54.7,
+        "stddev": 1.0909730620974214
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "keying": "global",
+      "jain": {
+        "n": 5,
+        "mean": 0.33502950892933314,
+        "min": 0.3283738081927612,
+        "max": 0.3484558087995986,
+        "stddev": 0.007758166190876892
+      },
+      "noisy_share_pct": {
+        "n": 5,
+        "mean": 52.25895564720163,
+        "min": 51.01645692158761,
+        "max": 52.88802839625686,
+        "stddev": 0.7196309782098635
+      }
+    },
+    {
+      "algorithm": "token_bucket",
+      "keying": "per_tenant",
+      "jain": {
+        "n": 5,
+        "mean": 0.9999948860742602,
+        "min": 0.9999927312030491,
+        "max": 0.9999969449855097,
+        "stddev": 1.858571164382876e-6
+      },
+      "noisy_share_pct": {
+        "n": 5,
+        "mean": 10.024008493816869,
+        "min": 10.016207455429498,
+        "max": 10.029211295034079,
+        "stddev": 0.005906010182115959
+      }
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "keying": "per_tenant",
+      "jain": {
+        "n": 5,
+        "mean": 0.9999948860742602,
+        "min": 0.9999927312030491,
+        "max": 0.9999969449855097,
+        "stddev": 1.858571164382876e-6
+      },
+      "noisy_share_pct": {
+        "n": 5,
+        "mean": 10.024008493816869,
+        "min": 10.016207455429498,
+        "max": 10.029211295034079,
+        "stddev": 0.005906010182115959
+      }
+    },
+    {
+      "algorithm": "fixed_window",
+      "keying": "per_tenant",
+      "jain": {
+        "n": 5,
+        "mean": 0.9999965458317025,
+        "min": 0.9999882944840265,
+        "max": 1.0,
+        "stddev": 4.979963855287457e-6
+      },
+      "noisy_share_pct": {
+        "n": 5,
+        "mean": 10.006007789128596,
+        "min": 10.0,
+        "max": 10.01669449081803,
+        "stddev": 0.007238045233854912
+      }
+    },
+    {
+      "algorithm": "sliding_window",
+      "keying": "per_tenant",
+      "jain": {
+        "n": 5,
+        "mean": 0.99942410071646,
+        "min": 0.9993237180299612,
+        "max": 0.9995022849644812,
+        "stddev": 0.00008402801118136942
+      },
+      "noisy_share_pct": {
+        "n": 5,
+        "mean": 10.66559877672496,
+        "min": 10.630758327427356,
+        "max": 10.702818408847664,
+        "stddev": 0.030496095087694994
+      }
+    },
+    {
+      "algorithm": "gcra",
+      "keying": "per_tenant",
+      "jain": {
+        "n": 5,
+        "mean": 0.9999948860742602,
+        "min": 0.9999927312030491,
+        "max": 0.9999969449855097,
+        "stddev": 1.858571164382876e-6
+      },
+      "noisy_share_pct": {
+        "n": 5,
+        "mean": 10.024008493816869,
+        "min": 10.016207455429498,
+        "max": 10.029211295034079,
+        "stddev": 0.005906010182115959
+      }
+    }
+  ]
+}
