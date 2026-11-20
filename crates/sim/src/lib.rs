@@ -36,6 +36,9 @@
 use drl_core::{Clock, Cost, Decision, ManualClock, Nanos, RateLimitConfig, RateLimiter};
 use std::time::Duration;
 
+mod scenarios;
+pub use scenarios::{diurnal, flash_crowd, merge, on_off, pareto, poisson};
+
 /// A small, fast, seeded PRNG (SplitMix64). Integer-only, so identical everywhere.
 #[derive(Debug, Clone)]
 pub struct SplitMix64 {
