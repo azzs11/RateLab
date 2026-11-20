@@ -88,6 +88,18 @@ story:
     cargo run -p bench --release -- story
     node web/scripts/report-pdf.mjs
 
+# Rebuild the README's animation (docs/screenshots/playground.png) from the built site.
+animation:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    frames="$(mktemp -d)"
+    trap 'kill $preview 2>/dev/null || true; pkill -f "vite preview --port 4173" || true; rm -rf "$frames"' EXIT
+    (cd web && npm run build >/dev/null && npx vite preview --port 4173 --strictPort >/dev/null 2>&1) &
+    preview=$!
+    until curl -fs http://localhost:4173/distributed-rate-limiter/ >/dev/null; do sleep 0.5; done
+    node web/scripts/readme-animation.mjs "$frames"
+    python3 -I web/scripts/apng.py docs/screenshots/playground.png "$frames"/f*.png
+
 # Free the rebuildable caches: Rust build output and Docker's build cache (all of it).
 clean:
     cargo clean

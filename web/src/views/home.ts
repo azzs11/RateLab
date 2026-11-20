@@ -710,6 +710,7 @@ export default function home(root: HTMLElement) {
           { class: "byline" },
           h("span", {}, "By ", h("a", { href: "https://github.com/azzs11" }, "Akchhya Singh")),
           dated,
+          h("a", { href: `${REPO}/blob/main/docs/report/the-price-of-exactness.pdf` }, "Report (PDF)"),
           h("a", { href: REPO }, "Source"),
         ),
       ),
