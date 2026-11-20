@@ -4,3 +4,9 @@
 .vscode/
 .idea/
 CLAUDE.md
+web/node_modules/
+web/dist/
+web/src/wasm-pkg/
+web/public/data/
+web/test-results/
+web/playwright-report/

@@ -1,0 +1,344 @@
+/* ---------- Hero ---------- */
+
+.hero {
+  padding-block: clamp(2.5rem, 6vw, 5.5rem) var(--s-8);
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 6fr) minmax(0, 7fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
+  align-items: center;
+}
+
+.hero-copy {
+  display: grid;
+  gap: var(--s-5);
+}
+
+.hero-em {
+  display: block;
+  color: var(--accent);
+}
+
+@media (max-width: 960px) {
+  .hero-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------- Attack figure ---------- */
+
+.attack-legend {
+  display: grid;
+  gap: var(--s-1);
+  margin-top: var(--s-3);
+}
+
+.attack-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-3);
+  font-size: 0.92rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px dashed var(--line);
+}
+
+.attack-row:last-child {
+  border-bottom: 0;
+}
+
+.attack-name {
+  font-weight: 600;
+}
+
+.attack-count {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.attack-count .num {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.attack-count.over .num {
+  color: var(--blocked);
+}
+
+.attack-count.over::after {
+  content: "  over the limit";
+  color: var(--blocked);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.attack-actions {
+  margin-top: var(--s-4);
+}
+
+/* ---------- Algorithm cards ---------- */
+
+.algo-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--s-4);
+  margin-bottom: var(--s-4);
+}
+
+@media (max-width: 1100px) {
+  .algo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .algo-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.algo-card {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto auto;
+  gap: var(--s-3);
+  padding: var(--s-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  text-decoration: none;
+  transition:
+    transform var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+
+.algo-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--line-strong);
+}
+
+.algo-card p {
+  font-size: 0.92rem;
+  color: var(--ink-2);
+  margin: 0;
+}
+
+.algo-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-2);
+  margin: 0;
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--line);
+}
+
+.algo-stats dt {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.algo-stats dd {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.algo-go {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  color: var(--accent);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+/* Glyphs: small drawings of each algorithm's state, in pure CSS. */
+.algo-glyph {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid var(--ink);
+  border-radius: 8px;
+}
+
+.algo-glyph[data-glyph="bucket"],
+.algo-glyph[data-glyph="leak"] {
+  border-top-color: transparent;
+  border-radius: 2px 2px 12px 12px;
+}
+
+.algo-glyph[data-glyph="bucket"]::after,
+.algo-glyph[data-glyph="leak"]::after {
+  content: "";
+  position: absolute;
+  inset: 45% 3px 3px;
+  background: var(--accent);
+  border-radius: 0 0 9px 9px;
+}
+
+.algo-glyph[data-glyph="leak"]::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -10px;
+  width: 4px;
+  height: 7px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+.algo-glyph[data-glyph="window"]::after {
+  content: "";
+  position: absolute;
+  inset: 6px 50% 6px 6px;
+  background: var(--accent);
+  border-radius: 3px;
+  box-shadow: 22px 0 0 -2px var(--accent-soft);
+}
+
+.algo-glyph[data-glyph="log"]::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 9px;
+  height: 3px;
+  background: var(--accent);
+  box-shadow:
+    0 8px 0 var(--accent),
+    0 16px 0 var(--accent),
+    0 24px 0 var(--line-strong);
+}
+
+.algo-glyph[data-glyph="tat"]::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 50%;
+  height: 2px;
+  background: var(--ink);
+}
+
+.algo-glyph[data-glyph="tat"]::before {
+  content: "";
+  position: absolute;
+  left: 62%;
+  top: 30%;
+  width: 3px;
+  height: 40%;
+  background: var(--accent);
+}
+
+/* ---------- Pareto ---------- */
+
+.pareto {
+  width: 100%;
+  height: auto;
+  font-family: var(--font-mono);
+}
+
+.pareto .grid {
+  stroke: var(--line);
+}
+
+.pareto .frame {
+  fill: none;
+  stroke: var(--line-strong);
+}
+
+.pareto .tick {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.pareto .axis {
+  fill: var(--ink-2);
+  font-size: 12px;
+  font-family: var(--font-text);
+}
+
+.pareto .corner {
+  fill: var(--accent);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 18px;
+}
+
+.pareto .point {
+  cursor: pointer;
+  outline: none;
+}
+
+.pareto .point .hit {
+  fill: transparent;
+}
+
+.pareto .point:hover .hit,
+.pareto .point:focus-visible .hit {
+  fill: var(--accent-soft);
+  stroke: var(--focus);
+  stroke-width: 2;
+}
+
+.pareto .point[data-dim="true"] {
+  opacity: 0.22;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-5);
+  list-style: none;
+  padding: 0;
+  margin: var(--s-3) 0 0;
+  font-size: 0.88rem;
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+/* ---------- Views ---------- */
+
+.view-head {
+  padding-block: var(--s-7) var(--s-5);
+  display: grid;
+  gap: var(--s-4);
+}
+
+.view-head h1 {
+  font-size: var(--step-3);
+}
+
+.loading {
+  padding-block: var(--s-8);
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+
+.cluster-teaser {
+  align-items: start;
+}
+
+tbody th {
+  font-family: var(--font-text);
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+  background: transparent;
+}
+
+.pareto {
+  max-height: 70vh;
+}
