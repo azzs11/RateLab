@@ -37,6 +37,7 @@
 #![deny(missing_docs)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
+use drl_core::strategies::{StoreOp, StoreReply};
 use drl_core::{CircuitBreaker, Clock, Cost, Decision, FailurePolicy, RateLimitConfig, Tokens};
 use redis::Script;
 use redis::aio::{ConnectionManager, ConnectionManagerConfig};
@@ -46,6 +47,9 @@ use thiserror::Error;
 
 /// The token bucket script, sent to Redis with EVALSHA.
 pub const TOKEN_BUCKET_LUA: &str = include_str!("../scripts/token_bucket.lua");
+
+/// The coordination store protocol (check, lease, return, sync) on the same bucket.
+pub const STORE_OP_LUA: &str = include_str!("../scripts/store_op.lua");
 
 /// Largest integer a Lua (double precision) number holds exactly.
 const MAX_EXACT: u128 = 1 << 53;
@@ -91,6 +95,7 @@ impl Default for RedisOptions {
 pub struct RedisRateLimiter {
     conn: ConnectionManager,
     script: Script,
+    store_script: Script,
     config: RateLimitConfig,
     window_us: u64,
     ttl_ms: u64,
@@ -149,6 +154,7 @@ impl RedisRateLimiter {
         Ok(Self {
             conn,
             script: Script::new(TOKEN_BUCKET_LUA),
+            store_script: Script::new(STORE_OP_LUA),
             config,
             window_us,
             ttl_ms: window_us.div_ceil(1_000) + 1,
@@ -190,6 +196,57 @@ impl RedisRateLimiter {
             other => return Err(StoreError::BadReply(format!("{other:?}"))),
         };
         Ok(decide(limit, self.window_us, cost, allowed, level))
+    }
+
+    /// Applies one coordination store operation to `key`'s bucket, atomically, on Redis
+    /// time. This is the shared store that `drl_core::strategies` talks to, so every
+    /// strategy can run against a real Redis. `Check { at: Some(..) }` still uses Redis
+    /// time: a real store never trusts the caller's clock.
+    pub async fn apply(&self, key: &str, op: &StoreOp) -> Result<StoreReply, StoreError> {
+        let limit = self.config.limit();
+        // Amounts above the limit change nothing a bucket can hold; clamping keeps the
+        // Lua arithmetic exact.
+        let clamp = |n: u64| n.min(limit + 1);
+        let (name, amount) = match *op {
+            StoreOp::Check { cost, .. } => ("check", clamp(cost.0)),
+            StoreOp::Lease { want } => ("lease", clamp(want)),
+            StoreOp::Return { amount } => ("return", clamp(amount)),
+            StoreOp::Sync { used } => ("sync", clamp(used)),
+        };
+        let mut conn = self.conn.clone();
+        self.calls.fetch_add(1, Ordering::Relaxed);
+        let reply: Vec<i64> = self
+            .store_script
+            .key(format!("{}{key}", self.prefix))
+            .arg(limit)
+            .arg(self.window_us)
+            .arg(name)
+            .arg(amount)
+            .arg(self.ttl_ms)
+            .invoke_async(&mut conn)
+            .await?;
+        let (result, level) = match reply.as_slice() {
+            [result, level, _now] if *result >= 0 && *level >= 0 => (*result as u64, *level as u64),
+            other => return Err(StoreError::BadReply(format!("{other:?}"))),
+        };
+        Ok(match *op {
+            StoreOp::Check { cost, .. } => {
+                StoreReply::Checked(decide(limit, self.window_us, cost, result == 1, level))
+            }
+            StoreOp::Lease { want } => StoreReply::Leased {
+                granted: result,
+                retry_after: (result == 0).then(|| {
+                    // Time until the whole lease is there (or a full bucket, if larger).
+                    let window = u128::from(self.window_us);
+                    let need =
+                        (u128::from(want.min(limit)) * window).saturating_sub(u128::from(level));
+                    let us = need.div_ceil(u128::from(limit));
+                    Duration::from_micros(u64::try_from(us).unwrap_or(u64::MAX))
+                }),
+            },
+            StoreOp::Return { .. } => StoreReply::Returned,
+            StoreOp::Sync { .. } => StoreReply::Synced { remaining: result },
+        })
     }
 
     /// Deletes the stored state for `key`.
@@ -354,5 +411,6 @@ mod tests {
     fn script_reads_redis_time_not_the_callers() {
         assert!(TOKEN_BUCKET_LUA.contains("redis.call('TIME')"));
         assert!(!TOKEN_BUCKET_LUA.contains("ARGV[5]"));
+        assert!(STORE_OP_LUA.contains("redis.call('TIME')"));
     }
 }

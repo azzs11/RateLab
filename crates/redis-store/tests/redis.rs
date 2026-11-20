@@ -4,7 +4,10 @@
 //! with `cargo test -p drl-redis-store -- --ignored` on every push, so they are never
 //! skipped there. Locally: start Docker, then run the same command.
 
-use drl_core::{BreakerConfig, BreakerState, CircuitBreaker, Cost, FailurePolicy, ManualClock};
+use drl_core::strategies::{Store, StoreOp, StoreReply};
+use drl_core::{
+    BreakerConfig, BreakerState, CircuitBreaker, Cost, FailurePolicy, ManualClock, Nanos,
+};
 use drl_core::{RateLimitConfig, Tokens};
 use drl_redis_store::{GuardedLimiter, RedisOptions, RedisRateLimiter, Source};
 use std::sync::Arc;
@@ -247,4 +250,76 @@ async fn breaker_opens_during_an_outage_and_policies_differ() {
     assert!(matches!(probe.source, Source::Redis), "{:?}", probe.source);
     assert!(probe.decision.allowed);
     assert_eq!(guarded.breaker().state(), BreakerState::Closed);
+}
+
+#[tokio::test]
+#[ignore = "needs Docker; CI runs it with --ignored"]
+async fn the_store_protocol_matches_the_simulated_store() {
+    let (_c, url) = redis().await;
+    let config = slow(10);
+    let redis = RedisRateLimiter::connect(&url, config).await.unwrap();
+    let mut model = Store::new(config);
+    // No refill happens during the test (10 per hour), so the two must agree exactly.
+    let ops = [
+        StoreOp::Lease { want: 4 },
+        StoreOp::Check {
+            cost: Cost(3),
+            at: None,
+        },
+        StoreOp::Sync { used: 2 },
+        StoreOp::Lease { want: 4 },
+        StoreOp::Lease { want: 4 },
+        StoreOp::Return { amount: 3 },
+        StoreOp::Check {
+            cost: Cost(2),
+            at: None,
+        },
+        StoreOp::Check {
+            cost: Cost(2),
+            at: None,
+        },
+        StoreOp::Sync { used: 50 },
+    ];
+    for op in ops {
+        let real = redis.apply("k", &op).await.unwrap();
+        let sim = model.handle(Nanos::ZERO, "k", &op);
+        match (real, sim) {
+            (StoreReply::Checked(a), StoreReply::Checked(b)) => {
+                assert_eq!(a.allowed, b.allowed, "{op:?}");
+                assert_eq!(a.remaining, b.remaining, "{op:?}");
+            }
+            (StoreReply::Leased { granted: a, .. }, StoreReply::Leased { granted: b, .. }) => {
+                assert_eq!(a, b, "{op:?}");
+            }
+            (a, b) => assert_eq!(a, b, "{op:?}"),
+        }
+    }
+}
+
+#[tokio::test]
+#[ignore = "needs Docker; CI runs it with --ignored"]
+async fn an_empty_lease_says_when_to_come_back() {
+    let (_c, url) = redis().await;
+    let redis = RedisRateLimiter::connect(&url, RateLimitConfig::per_second(10).unwrap())
+        .await
+        .unwrap();
+    redis
+        .apply("k", &StoreOp::Lease { want: 10 })
+        .await
+        .unwrap();
+    match redis.apply("k", &StoreOp::Lease { want: 5 }).await.unwrap() {
+        StoreReply::Leased {
+            granted: 0,
+            retry_after: Some(d),
+        } => {
+            // About half a second until 5 tokens refill at 10 per second.
+            assert!(
+                d <= Duration::from_millis(500) && d > Duration::from_millis(400),
+                "{d:?}"
+            );
+        }
+        // A refill can land between the two calls on a slow machine.
+        StoreReply::Leased { granted, .. } => assert!(granted <= 1),
+        other => panic!("{other:?}"),
+    }
 }
