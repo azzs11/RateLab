@@ -18,9 +18,10 @@
 
 Five rate limiting algorithms behind one `RateLimiter` trait, with thread-safe
 state and injected time; a Redis store that several nodes share, behind a circuit
-breaker; an Axum server whose Tower layer sends IETF `RateLimit` headers; and a
-benchmark that measures accuracy against an exact oracle, on one machine and on a
-3-node Docker cluster.
+breaker; an Axum server whose Tower layer sends IETF `RateLimit` headers; five
+**coordination strategies** for enforcing one limit across N nodes, compared in a
+deterministic cluster simulator; and a benchmark that measures accuracy against an
+exact oracle, on one machine and on a 3-node Docker cluster.
 
 The project is being reworked into a rate limiter that **measures and reports
 its own accuracy**. See [docs/ROADMAP.md](docs/ROADMAP.md) for the plan.
@@ -70,6 +71,26 @@ to the same Redis enforces one shared limit.
   call's `FailurePolicy` decides: **fail open** (allow) or **fail closed** (deny).
 - **Tested against a real Redis** started by testcontainers, including an outage.
 
+### Coordination strategies (`drl_core::strategies`)
+
+How N nodes enforce **one** limit together. Each strategy is a state machine with no
+I/O: it receives requests, store replies and timer ticks, and returns decisions and
+messages for a shared store (the logic Redis runs). The same code runs in the
+simulator and in tests.
+
+| Strategy | Talks to the store | Trade-off |
+|----------|--------------------|-----------|
+| `central_exact` | once per request | exact; every request waits a round trip |
+| `local_split` | never | each node gets `limit / N`; wrong when traffic is uneven |
+| `async_sync` | one sync per key every few ms | never waits; over-admits between syncs |
+| `fixed_leasing` | once per fixed chunk of tokens | spends borrowed tokens locally; leftovers expire |
+| `adaptive_leasing` | leases sized by demand | lease grows when used up fast, shrinks when the store is short, idle leftovers go back |
+
+The simulator (`sim::cluster`) runs N nodes and a store over a simulated network with
+delay, jitter, clock skew, timeouts and outages, from one event queue and a seed, so
+every run is reproducible bit for bit. Every strategy passes a shared conformance
+suite (`crates/sim/tests/strategy_conformance.rs`).
+
 ### HTTP server (`crates/server`)
 
 An Axum app with a Tower `RateLimitLayer` on real routes:
@@ -108,10 +129,10 @@ too early. `/metrics` exports Prometheus counters and a decision-time histogram
 
 | Crate | What it holds |
 |-------|---------------|
-| `crates/core` (`drl-core`) | Algorithms, `Clock`, `Decision`, circuit breaker, unit newtypes. No I/O. |
+| `crates/core` (`drl-core`) | Algorithms, coordination strategies, `Clock`, `Decision`, circuit breaker, unit newtypes. No I/O. |
 | `crates/redis-store` (`drl-redis-store`) | Redis token bucket (Lua, EVALSHA, Redis `TIME`) and `GuardedLimiter` |
 | `crates/server` | Axum server with the Tower layer and dashboard (`web-server`), demo binary (`demo`) |
-| `crates/sim` | Deterministic traffic scenarios |
+| `crates/sim` | Deterministic traffic scenarios and the multi-node cluster simulator |
 | `crates/wasm` | wasm-bindgen wrapper for the browser |
 | `crates/bench` | Exact oracle, measurement suite, load generator, RESULTS.md writer, Criterion benches |
 | `deploy/` | Dockerfile and Docker Compose: 3 nodes, Redis, load generator |
@@ -268,15 +289,22 @@ and the table above:
 1. `cargo run -p bench --release -- local`: in-process accuracy, latency,
    throughput and fairness (`results/local.json`);
 2. `cargo run -p bench --release --bin memory`: bytes per key (`results/memory.json`);
-3. `just cluster`: 3 nodes + Redis + load generator in Docker Compose
+3. `cargo run -p bench --release -- strategies`: the five coordination strategies on
+   1, 3 and 8 simulated nodes, plus clock skew, store outage and traffic shift
+   (`results/strategies.json`);
+4. `just cluster`: 3 nodes + Redis + load generator in Docker Compose
    (`results/cluster.json`);
-4. `cargo run -p bench --release -- report`: the Markdown, from the JSON files only.
+5. `cargo run -p bench --release -- report`: the Markdown and the Pareto charts, from
+   the JSON files only.
 
 **Method.**
 
 - **Accuracy:** measured against an exact oracle, a plain log per key that admits a
   request only if the key stays within its limit in every window-long span. The
   oracle shares no code with the library.
+- **Strategies:** admission error counts units admitted above (or missing below) one
+  perfectly coordinated token bucket, per key and per window. RESULTS.md lists every
+  configuration where adaptive leasing is beaten.
 - **Scenarios:** seeded, so accuracy numbers are reproducible bit for bit.
 - **Latency and throughput:** warmed up, then repeated; the tables show mean and
   min–max.
@@ -288,6 +316,9 @@ and the table above:
 - **Cluster run:** the nodes, Redis and the load generator share one machine and
   Docker's network, so the cluster numbers show the protocol's behaviour, not a
   production deployment.
+- **Strategy simulation:** the network is a model (fixed delay plus jitter), so those
+  numbers compare protocols; they are not measurements of a real network. The
+  strategies do not yet run against a real Redis.
 - **Latency on macOS:** the clock ticks too coarsely to time one call, so latency is
   timed in batches of calls (see RESULTS.md).
 
@@ -315,8 +346,8 @@ test pauses Redis with `CLIENT PAUSE` instead of waiting.
 
 These features are **not built yet**:
 
-- **Coordination strategies:** local split, async sync and adaptive quota leasing,
-  compared with Redis-per-call on the same benchmark (Phase 3)
+- **Strategies on real Redis:** Lua scripts for lease, return and sync, and the
+  strategies running on the 3-node Docker cluster
 - **Multi-tier limits:** per user, IP, endpoint and global limits combined
 - **WebSocket support:** live dashboard updates
 
