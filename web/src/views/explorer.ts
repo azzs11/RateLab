@@ -60,7 +60,7 @@ function beatsAdaptive(rows: StrategyRow[]) {
 export default async function explorer(root: HTMLElement, params: URLSearchParams) {
   root.append(
     masthead(
-      "Instrument 3 of 5",
+      "Instrument 3 of 6",
       "Strategy explorer",
       "Every coordination strategy on every traffic pattern, from the benchmark. Each point is one strategy on one pattern, averaged over several seeds; any point can be replayed in the cluster instrument.",
     ),

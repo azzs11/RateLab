@@ -7,12 +7,14 @@ import { attackFigure, type AttackFigure } from "../components/attack";
 import { figure } from "../components/figure";
 import { goodputChart, type GoodputLine } from "../components/goodput";
 import { paretoChart, paretoLegend } from "../components/pareto";
+import { lineChart, type Series } from "../components/lines";
 import {
   loadResults,
   type LocalResults,
   type MemoryResults,
   type OverloadResults,
   type StrategyResults,
+  type Summary,
   type TraceResults,
 } from "../lib/data";
 import { afterPaint, h } from "../lib/dom";
@@ -479,9 +481,93 @@ function overloadSection(core: Core | null): HTMLElement {
   );
 }
 
-// ---------- §6 What I got wrong ----------
+// ---------- §6 LLM tokens ----------
 
-function wrongSection(local: LocalResults | null, traces: TraceResults | null, overload: OverloadResults | null): HTMLElement {
+interface LlmData {
+  homepage: string;
+  citation: string;
+  scenarios: {
+    name: string;
+    requests: number;
+    span_secs: number;
+    rows: { accounting: string; wrongly_blocked_pct: Summary; overspend_pct: Summary; worst_window: Summary; recovery_mean_ms: Summary }[];
+    balance: [string, [number, number][]][];
+  }[];
+}
+
+const ACCOUNTING_STYLE: Record<string, { colour: string; dash: string; width: number; label: string }> = {
+  estimate_only: { colour: "#E69F00", dash: "9 3 2 3", width: 2, label: "Estimate only" },
+  reserve_max: { colour: "#0072B2", dash: "5 3", width: 2, label: "Reserve the maximum" },
+  admit_then_reconcile: { colour: "#009E73", dash: "", width: 2.5, label: "Admit, then reconcile" },
+};
+
+function tokensSection(llm: LlmData | null): HTMLElement {
+  const a = llm?.scenarios.find((s) => s.name === "azure_2023");
+  const row = (n: string) => a?.rows.find((r) => r.accounting === n);
+  const res = row("reserve_max");
+  const rec = row("admit_then_reconcile");
+  const est = row("estimate_only");
+  let body: Node[] = [h("p", { class: "note" }, "The LLM benchmark has not been run for this build.")];
+  if (llm && a && res && rec && est) {
+    const series: Series[] = a.balance.map(([name, pts]) => ({
+      name: ACCOUNTING_STYLE[name]?.label ?? name,
+      colour: ACCOUNTING_STYLE[name]?.colour ?? "#777",
+      dash: ACCOUNTING_STYLE[name]?.dash,
+      width: ACCOUNTING_STYLE[name]?.width,
+      points: pts,
+    }));
+    const fig = figure(
+      "4",
+      "One tenant's budget, on real traffic.",
+      "The busiest tenant's output tokens left over the first ten minutes of the Azure trace, under each way of charging. Below zero, it owes.",
+      h("div", { class: "figure-body" }, lineChart(series, { title: "The busiest tenant's output budget on the Azure trace", xLabel: "seconds", yLabel: "output tokens left", height: 260, xMax: 600 })),
+    );
+    fig.classList.add("wide");
+    body = [
+      h(
+        "p",
+        {},
+        `The benchmark replays ${fmtInt(a.requests)} real requests from `,
+        h("a", { href: llm.homepage }, "Azure's public LLM trace"),
+        `, a ${Math.round(a.span_secs / 60)}-minute sample of two production services, with every request's true prompt and answer lengths. Reserving the maximum turned away `,
+        h("strong", {}, fmtPct(res.wrongly_blocked_pct.mean, 1)),
+        " of all requests that an oracle knowing each answer's length would have served; most answers are far shorter than their maximum, so the reserved budget sits unused. Admit-then-reconcile turned away ",
+        h("strong", {}, fmtPct(rec.wrongly_blocked_pct.mean, 1)),
+        `, overspent ${fmtPct(rec.overspend_pct.mean, 2)}, and tenants that fell into debt repaid it in ${fmtInt(rec.recovery_mean_ms.mean)} ms on average.`,
+      ),
+      fig,
+      h(
+        "aside",
+        { class: "side" },
+        "The trace has no user ids, so requests are spread over tenants by a seeded draw. Cite: ",
+        h("cite", {}, llm.citation),
+        ".",
+      ),
+    ];
+  }
+  return section(
+    "tokens",
+    6,
+    "When the cost arrives after the answer",
+    h(
+      "p",
+      {},
+      "An LLM request costs its prompt, known when it arrives, and its answer, known only after the last token has streamed. A limiter must decide before then. It can charge an estimate and hope; reserve the request's maximum and refund the rest; or charge the estimate and settle the difference afterwards, letting the tenant run into debt.",
+    ),
+    ...body,
+    h(
+      "p",
+      {},
+      "Send requests to all three at once, and run an hour of your own traffic, in the ",
+      h("a", { href: "#/tokens" }, "tokens instrument"),
+      ".",
+    ),
+  );
+}
+
+// ---------- §7 What I got wrong ----------
+
+function wrongSection(local: LocalResults | null, traces: TraceResults | null, overload: OverloadResults | null, llm: LlmData | null): HTMLElement {
   const items: HTMLElement[] = [];
   if (local) {
     items.push(
@@ -519,6 +605,19 @@ function wrongSection(local: LocalResults | null, traces: TraceResults | null, o
       );
     }
   }
+  const azure = llm?.scenarios.find((x) => x.name === "azure_2023");
+  const est = azure?.rows.find((r) => r.accounting === "estimate_only");
+  const res = azure?.rows.find((r) => r.accounting === "reserve_max");
+  if (est && res) {
+    items.push(
+      h(
+        "li",
+        {},
+        h("strong", {}, "I had the LLM risks backwards. "),
+        `I expected charging a guess to overspend badly and reserving the maximum to be the safe choice. On an hour of real requests, the guess overspent ${fmtPct(est.overspend_pct.mean, 2)}, because a learned average errs both ways and the errors cancel, while reserving the maximum turned away ${fmtPct(res.wrongly_blocked_pct.mean, 1)} of the requests a perfect limiter would have served.`,
+      ),
+    );
+  }
   items.push(
     h(
       "li",
@@ -529,7 +628,7 @@ function wrongSection(local: LocalResults | null, traces: TraceResults | null, o
   );
   return section(
     "wrong",
-    6,
+    7,
     "What I got wrong",
     h("p", {}, "A benchmark that never surprises its author is probably measuring the author. These are the results that changed the code or the claims."),
     h("ol", { class: "wrong-list" }, ...items),
@@ -541,7 +640,7 @@ function wrongSection(local: LocalResults | null, traces: TraceResults | null, o
 function useSection(): HTMLElement {
   return section(
     "use",
-    7,
+    8,
     "Using it",
     h(
       "p",
@@ -594,6 +693,7 @@ export default function home(root: HTMLElement) {
               ["cluster", "One limit, many nodes"],
               ["price", "The price of exactness"],
               ["overload", "When the backend cannot keep up"],
+              ["tokens", "When the cost arrives after the answer"],
               ["wrong", "What I got wrong"],
               ["use", "Using it"],
             ].map(([id, t]) => h("li", {}, h("a", { href: `#${id}`, onclick: (e: Event) => jump(e, id) }, t))),
@@ -626,7 +726,8 @@ export default function home(root: HTMLElement) {
     loadResults<LocalResults>("local"),
     loadResults<TraceResults>("traces"),
     loadResults<OverloadResults>("overload"),
-  ])).then(([core, strategies, memory, local, traces, overload]) => {
+    loadResults<LlmData>("llm"),
+  ])).then(([core, strategies, memory, local, traces, overload, llm]) => {
     if (disposed) return;
     if (local) dated.textContent = `Measured ${local.machine.measured_at.slice(0, 10)}`;
     // One section per task, after the first paint, so reading never waits on a figure.
@@ -636,7 +737,8 @@ export default function home(root: HTMLElement) {
       () => clusterSection(core),
       () => priceSection(strategies),
       () => overloadSection(core),
-      () => wrongSection(local, traces, overload),
+      () => tokensSection(llm),
+      () => wrongSection(local, traces, overload, llm),
       () => useSection(),
     ];
     const next = () => {

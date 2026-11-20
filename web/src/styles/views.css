@@ -437,3 +437,84 @@ td.lead {
 figure.stack {
   margin: 0;
 }
+
+/* ---------- Tokens ---------- */
+
+.token-demo {
+  display: grid;
+  gap: var(--s-5);
+  border-top: 1px solid var(--ink);
+  padding-top: var(--s-4);
+}
+
+.budgets {
+  display: grid;
+  gap: var(--s-4);
+}
+
+.budget-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-3);
+  font-size: var(--step--1);
+}
+
+.budget-track {
+  position: relative;
+  height: 14px;
+  margin-top: var(--s-2);
+  background: var(--surface-2);
+}
+
+.budget-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--ink-2);
+}
+
+.budget-fill.debt {
+  background: var(--blocked);
+}
+
+.budget-zero {
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  bottom: -4px;
+  border-left: 1px solid var(--ink);
+}
+
+.budget-foot {
+  margin-top: var(--s-1);
+}
+
+.stream {
+  list-style: none;
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--s-1);
+  font-size: var(--step--1);
+  min-height: 9rem;
+  align-content: start;
+}
+
+.stream li {
+  display: grid;
+  grid-template-columns: 3rem 1fr 9rem;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.stream-bar {
+  height: 6px;
+  background: var(--surface-2);
+  position: relative;
+}
+
+.stream-bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent);
+}

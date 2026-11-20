@@ -314,7 +314,7 @@ function panel(r: Run, p: Params, getT: () => number) {
 export default async function lab(root: HTMLElement, params: URLSearchParams) {
   root.append(
     masthead(
-      "Instrument 1 of 5",
+      "Instrument 1 of 6",
       "Algorithm lab",
       `One algorithm, or two side by side, on the same traffic: every decision over ${SECS} seconds and what the algorithm remembered at each moment.`,
     ),

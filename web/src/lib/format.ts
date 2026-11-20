@@ -24,7 +24,12 @@ export const fmtRate = (perSec: number): string => {
 };
 
 /** snake_case → "Snake case" for display. */
-const NAMES: Record<string, string> = { gcra: "GCRA", aimd: "AIMD", gradient2: "Gradient2" };
+const NAMES: Record<string, string> = {
+  gcra: "GCRA",
+  aimd: "AIMD",
+  gradient2: "Gradient2",
+  azure_2023: "Azure LLM trace, 2023",
+};
 
 export const pretty = (name: string): string =>
   NAMES[name] ?? name.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());

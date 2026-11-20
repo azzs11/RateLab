@@ -42,6 +42,7 @@ const ROUTES: Route[] = [
   { path: "cluster", label: "Cluster", title: "Cluster", group: "instrument", load: () => import("./views/cluster") },
   { path: "explorer", label: "Explorer", title: "Strategy explorer", group: "instrument", load: () => import("./views/explorer") },
   { path: "overload", label: "Overload", title: "Overload", group: "instrument", load: () => import("./views/overload") },
+  { path: "tokens", label: "Tokens", title: "Tokens", group: "instrument", load: () => import("./views/tokens") },
   { path: "replay", label: "Replay", title: "Replay your logs", group: "instrument", load: () => import("./views/replay") },
   { path: "results", label: "Results", title: "Results", group: "appendix", load: () => import("./views/results") },
 ];

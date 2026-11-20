@@ -25,7 +25,7 @@ const ABOUT: Record<string, string> = {
 export default async function overload(root: HTMLElement, params: URLSearchParams) {
   root.append(
     masthead(
-      "Instrument 4 of 5",
+      "Instrument 4 of 6",
       "Overload",
       "What happens when more requests arrive than a backend can serve, with and without a limit on how many may be in progress at once.",
     ),

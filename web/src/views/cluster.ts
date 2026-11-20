@@ -313,7 +313,7 @@ function readParams(q: URLSearchParams): Params {
 export default async function cluster(root: HTMLElement, query: URLSearchParams) {
   root.append(
     masthead(
-      "Instrument 2 of 5",
+      "Instrument 2 of 6",
       "Cluster",
       "Several servers enforcing one shared limit. Choose how they coordinate, then break things: skew their clocks, cut off the store, pile the traffic onto one node.",
     ),

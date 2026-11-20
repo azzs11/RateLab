@@ -139,6 +139,85 @@ interface Overload {
   }[];
 }
 
+interface Llm {
+  machine: Machine;
+  homepage: string;
+  citation: string;
+  tenants: number;
+  window_secs: number;
+  target_blocked_pct: number;
+  streaming_ms: [number, number];
+  scenarios: {
+    name: string;
+    description: string;
+    requests: number;
+    input_limit: number;
+    output_limit: number;
+    oracle_blocked_pct: Summary;
+    rows: {
+      accounting: string;
+      blocked_pct: Summary;
+      wrongly_blocked_pct: Summary;
+      overspend_pct: Summary;
+      worst_window: Summary;
+      debts: Summary;
+      recovery_mean_ms: Summary;
+    }[];
+  }[];
+  real: {
+    speedup: number;
+    trace_minutes: number;
+    requests: number;
+    rows: { accounting: string; blocked_pct: [number, number]; overspend_pct: [number, number]; debts: [number, number] }[];
+  } | null;
+}
+
+function llmBlock(l: Llm): HTMLElement {
+  const body: HTMLElement[] = [];
+  for (const sc of l.scenarios) {
+    body.push(
+      table(
+        `${pretty(sc.name)}: ${fmtInt(sc.requests)} requests; limits ${fmtInt(sc.input_limit)} input and ${fmtInt(sc.output_limit)} output tokens per tenant per minute; the oracle refused ${fmtPct(sc.oracle_blocked_pct.mean, 1)}`,
+        ["Charging", "Refused", "Wrongly refused", "Overspend", "Worst window", "Debts", "Repaid in"],
+        sc.rows.map((r) => [
+          pretty(r.accounting),
+          fmtPct(r.blocked_pct.mean, 1),
+          fmtPct(r.wrongly_blocked_pct.mean, 1),
+          fmtPct(r.overspend_pct.mean, 2),
+          `${fmtNum(r.worst_window.mean, 2)}×`,
+          fmtInt(r.debts.mean),
+          r.debts.mean > 0 ? `${fmtInt(r.recovery_mean_ms.mean)} ms` : "–",
+        ]),
+      ),
+    );
+  }
+  if (l.real) {
+    const r = l.real;
+    body.push(
+      table(
+        `The real layer against the simulator: the first ${r.trace_minutes} minute(s) of the trace, ${fmtInt(r.requests)} requests, streamed in real time at ${r.speedup}× speed`,
+        ["Charging", "Refused, real", "Refused, sim", "Overspend, real", "Overspend, sim", "Debts, real", "Debts, sim"],
+        r.rows.map((x) => [
+          pretty(x.accounting),
+          fmtPct(x.blocked_pct[0], 2),
+          fmtPct(x.blocked_pct[1], 2),
+          fmtPct(x.overspend_pct[0], 3),
+          fmtPct(x.overspend_pct[1], 3),
+          fmtInt(x.debts[0]),
+          fmtInt(x.debts[1]),
+        ]),
+      ),
+    );
+  }
+  return block(
+    "llm",
+    "LLM tokens",
+    `Input and output budgets per tenant per ${l.window_secs} s, with three ways to charge for answers not yet written, against an oracle that knows every answer's length. Limits are chosen so the oracle refuses at most ${l.target_blocked_pct}%. Requests are spread over ${l.tenants} tenants by a seeded draw; answers stream at ${l.streaming_ms[0]} ms to the first token and ${l.streaming_ms[1]} ms a token after. Real requests: the Azure LLM inference trace (${l.citation}).`,
+    l.machine,
+    ...body,
+  );
+}
+
 function overloadBlock(o: Overload): HTMLElement {
   const capacity = Math.round((o.workers * 1000) / o.service_ms);
   const body: HTMLElement[] = [];
@@ -202,7 +281,7 @@ export default async function results(root: HTMLElement) {
     ),
   );
   await afterPaint();
-  const [local, memory, cluster, strategies, traces, real, overload] = await Promise.all([
+  const [local, memory, cluster, strategies, traces, real, overload, llm] = await Promise.all([
     loadResults<Local>("local"),
     loadResults<Memory>("memory"),
     loadResults<Cluster>("cluster"),
@@ -210,6 +289,7 @@ export default async function results(root: HTMLElement) {
     loadResults<Traces>("traces"),
     loadResults<RealStrategies>("real_strategies"),
     loadResults<Overload>("overload"),
+    loadResults<Llm>("llm"),
   ]);
 
   
@@ -448,6 +528,7 @@ export default async function results(root: HTMLElement) {
   }
 
   if (overload) root.append(overloadBlock(overload));
+  if (llm) root.append(llmBlock(llm));
 
   root.append(h("div", { class: "spacer" }));
   return () => {};

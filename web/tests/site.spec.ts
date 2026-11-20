@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-const ROUTES = ["", "lab", "cluster", "explorer", "overload", "replay", "results"];
+const ROUTES = ["", "lab", "cluster", "explorer", "overload", "tokens", "replay", "results"];
 
 async function open(page: Page, route: string) {
   const errors: string[] = [];
@@ -66,6 +66,16 @@ test("the overload instrument compares four limits", async ({ page }) => {
   await open(page, "overload");
   await expect(page.locator("table tbody tr")).toHaveCount(4);
   await expect(page.locator("tr.best th")).toHaveText("Gradient2");
+});
+
+test("five requests at once: estimate-only admits all, reserving the maximum admits one", async ({ page }) => {
+  await open(page, "tokens");
+  await page.getByRole("button", { name: "Send five at once" }).click();
+  const feet = page.locator(".budget-foot");
+  await expect(feet.nth(0)).toContainText("5 admitted, 0 refused");
+  await expect(feet.nth(1)).toContainText("1 admitted, 4 refused");
+  await expect(feet.nth(2)).toContainText("5 admitted, 0 refused");
+  await expect(page.locator(".stream li")).toHaveCount(5);
 });
 
 test("the lab can compare two algorithms", async ({ page }) => {

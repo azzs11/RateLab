@@ -272,7 +272,7 @@ export default async function replay(root: HTMLElement) {
   );
   root.append(
     masthead(
-      "Instrument 5 of 5",
+      "Instrument 6 of 6",
       "Replay your logs",
       "Guessing a limit is how rate limits end up blocking good customers. Load an access log to see what each algorithm would have done with it, and which limit keeps blocking under your target.",
     ),

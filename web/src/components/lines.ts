@@ -14,7 +14,8 @@ export interface Series {
   step?: boolean;
 }
 
-const fmtTick = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : `${Math.round(v)}`);
+const fmtTick = (v: number) =>
+  Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : `${Math.round(v)}`;
 
 export function lineChart(
   series: Series[],
@@ -30,24 +31,29 @@ export function lineChart(
   const B = 40;
   const all = series.flatMap((s) => s.points).filter(([, y]) => Number.isFinite(y));
   const xMax = opts.xMax ?? Math.max(1, ...all.map(([x]) => x));
-  // Four gridlines at round steps: 1, 2, 2.5 or 5 times a power of ten.
-  const raw = Math.max(0, ...all.map(([, y]) => y));
+  // Gridlines at round steps (1, 2, 2.5 or 5 times a power of ten), from zero, or
+  // from below zero when a line goes negative (debt).
+  const hi = Math.max(0, ...all.map(([, y]) => y));
+  const lo = Math.min(0, ...all.map(([, y]) => y));
   const yStep = (() => {
-    if (!(raw > 0)) return 0.25;
-    const target = raw / 4;
+    const span = hi - lo;
+    if (!(span > 0)) return 0.25;
+    const target = span / 4;
     const p = 10 ** Math.floor(Math.log10(target));
     return [1, 2, 2.5, 5, 10].map((m) => m * p).find((c) => c >= target) ?? 10 * p;
   })();
-  const yMax = yStep * 4;
+  const yMin = Math.floor(lo / yStep) * yStep;
+  const steps = Math.max(1, Math.ceil((hi - yMin) / yStep));
+  const yMax = yMin + steps * yStep;
   const px = (x: number) => L + (x / xMax) * (W - L - R);
-  const py = (y: number) => T + (H - T - B) - (y / yMax) * (H - T - B);
+  const py = (y: number) => T + (H - T - B) - ((y - yMin) / (yMax - yMin)) * (H - T - B);
 
   let out = "";
-  for (let i = 0; i <= 4; i++) {
-    const v = (yMax * i) / 4;
+  for (let i = 0; i <= steps; i++) {
+    const v = yMin + yStep * i;
     out += `<line x1="${L}" y1="${py(v)}" x2="${W - R}" y2="${py(v)}" class="grid"/><text x="${L - 6}" y="${py(v) + 4}" text-anchor="end" class="tick">${fmtTick(v)}</text>`;
   }
-  const xStep = xMax > 30 ? 10 : xMax > 12 ? 5 : 2;
+  const xStep = xMax > 300 ? 60 : xMax > 120 ? 30 : xMax > 30 ? 10 : xMax > 12 ? 5 : 2;
   for (let x = 0; x <= xMax + 1e-9; x += xStep) {
     out += `<text x="${px(x)}" y="${H - B + 16}" text-anchor="middle" class="tick">${x}</text>`;
   }
