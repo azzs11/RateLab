@@ -255,8 +255,14 @@ checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 name = "bench"
 version = "0.6.0"
 dependencies = [
+ "anyhow",
+ "cap",
+ "clap",
  "criterion",
  "drl-core",
+ "serde",
+ "serde_json",
+ "sim",
 ]
 
 [[package]]
@@ -359,6 +365,12 @@ name = "bytes"
 version = "1.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "776dfebd015e2d8732c684a2c71003674ccb49457b539b9e82151ba38e96dd7c"
+
+[[package]]
+name = "cap"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f125eb85b84a24c36b02ed1d22c9dd8632f53b3cde6e4d23512f94021030003"
 
 [[package]]
 name = "cast"

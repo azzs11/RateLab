@@ -1,110 +1,112 @@
-//! Measurement scenarios: `cargo run -p bench --release -- <scenario>`.
+//! `cargo run -p bench --release -- <command>`
 //!
-//! Every number printed here is measured on the machine running it. Nothing is
-//! asserted: speed depends on the hardware, so it does not belong in `cargo test`.
-//! Phase 2 of the roadmap turns this into the full benchmark (exact oracle, JSON
-//! output, generated RESULTS.md with machine specs).
+//! - `local`: in-process accuracy, latency, throughput and fairness → `results/local.json`
+//! - `report`: `results/*.json` → `results/RESULTS.md` and the README's results table
+//!
+//! Memory per key is a separate binary (`--bin memory`), and the 3-node run is the
+//! `loadgen` binary inside Docker Compose. `just results` runs all of them.
 
-use drl_core::{Algorithm, Cost, MonotonicClock, RateLimitConfig, RateLimiter};
-use std::hint::black_box;
-use std::process::ExitCode;
+use anyhow::Context;
+use bench::local::{self, SuiteSize};
+use bench::machine::Machine;
+use bench::report::{self, Inputs};
+use bench::results::{LocalResults, SCHEMA, read_json, write_json};
+use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 use std::time::Instant;
 
-const USAGE: &str = "usage: cargo run -p bench --release -- <scenario>
+#[derive(Parser)]
+#[command(about = "Reproducible rate limiter measurements")]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
+}
 
-scenarios:
-  load      single-threaded decisions per second, every algorithm, 100 keys
-  latency   per-call time percentiles (includes timer overhead), every algorithm";
+#[derive(Subcommand)]
+enum Command {
+    /// Run the in-process suite.
+    Local {
+        /// Small sizes for CI; the numbers are not meaningful.
+        #[arg(long)]
+        quick: bool,
+        /// Output file.
+        #[arg(long, default_value = "results/local.json")]
+        out: PathBuf,
+    },
+    /// Generate RESULTS.md and the README table from the result files.
+    Report {
+        /// Folder with the JSON files; RESULTS.md is written here.
+        #[arg(long, default_value = "results")]
+        dir: PathBuf,
+        /// README to update between the results markers.
+        #[arg(long, default_value = "README.md")]
+        readme: PathBuf,
+    },
+}
 
-fn main() -> ExitCode {
-    let scenario = std::env::args().nth(1);
-    match scenario.as_deref() {
-        Some("load") => load(),
-        Some("latency") => latency(),
-        _ => {
-            eprintln!("{USAGE}");
-            return ExitCode::FAILURE;
-        }
+fn main() -> anyhow::Result<()> {
+    match Cli::parse().command {
+        Command::Local { quick, out } => run_local(quick, &out),
+        Command::Report { dir, readme } => run_report(&dir, &readme),
     }
-    ExitCode::SUCCESS
 }
 
-fn limiter(algorithm: Algorithm, limit: u64) -> Box<dyn RateLimiter> {
-    let config = RateLimitConfig::per_second(limit).expect("limit is non-zero");
-    algorithm.build(config, MonotonicClock::new())
-}
-
-fn build_profile() -> &'static str {
+fn run_local(quick: bool, out: &std::path::Path) -> anyhow::Result<()> {
     if cfg!(debug_assertions) {
-        "debug build: numbers are not representative, use --release"
+        eprintln!(
+            "warning: debug build; latency and throughput are not representative (use --release)"
+        );
+    }
+    let size = if quick {
+        SuiteSize::quick()
     } else {
-        "release build"
-    }
+        SuiteSize::full()
+    };
+    let machine = Machine::detect();
+    eprintln!("machine: {}", machine.one_line());
+    let started = Instant::now();
+    let step = |name: &str| eprintln!("[{:>6.1} s] {name}", started.elapsed().as_secs_f64());
+
+    step("accuracy");
+    let accuracy = local::accuracy(&size);
+    step("fairness");
+    let fairness = local::fairness(&size);
+    step("latency");
+    let timer = local::timer_info();
+    let latency = local::latency(&size);
+    let throughput = local::throughput(&size, step);
+
+    write_json(
+        out,
+        &LocalResults {
+            schema: SCHEMA,
+            machine,
+            size,
+            timer,
+            accuracy,
+            latency,
+            throughput,
+            fairness,
+        },
+    )?;
+    step(&format!("wrote {}", out.display()));
+    Ok(())
 }
 
-/// The old load test: 50,000 checks spread over 100 keys, one thread.
-fn load() {
-    const CHECKS: u64 = 50_000;
-    const KEYS: u64 = 100;
-    let keys: Vec<String> = (0..KEYS).map(|i| format!("user{i}")).collect();
+fn run_report(dir: &std::path::Path, readme: &std::path::Path) -> anyhow::Result<()> {
+    let inputs = Inputs {
+        local: read_json(&dir.join("local.json"))?,
+        memory: read_json(&dir.join("memory.json"))?,
+    };
+    let results_path = dir.join("RESULTS.md");
+    std::fs::write(&results_path, report::results_md(&inputs))
+        .with_context(|| format!("write {}", results_path.display()))?;
+    eprintln!("wrote {}", results_path.display());
 
-    println!("scenario: load ({CHECKS} checks, {KEYS} keys, 1 thread, limit 10000/s)");
-    println!("{}", build_profile());
-    println!(
-        "{:<15} {:>14} {:>9} {:>9}",
-        "algorithm", "decisions/s", "allowed", "blocked"
-    );
-    for algorithm in Algorithm::ALL {
-        let l = limiter(algorithm, 10_000);
-        let mut allowed = 0u64;
-        let start = Instant::now();
-        for i in 0..CHECKS {
-            if l.check(black_box(&keys[(i % KEYS) as usize]), Cost::ONE)
-                .allowed
-            {
-                allowed += 1;
-            }
-        }
-        let secs = start.elapsed().as_secs_f64();
-        println!(
-            "{:<15} {:>14.0} {:>9} {:>9}",
-            algorithm.name(),
-            CHECKS as f64 / secs,
-            allowed,
-            CHECKS - allowed
-        );
-    }
-}
-
-/// Per-call latency percentiles over 10,000 checks on 10 keys.
-fn latency() {
-    const CHECKS: usize = 10_000;
-    let keys: Vec<String> = (0..10).map(|i| format!("user{i}")).collect();
-
-    println!("scenario: latency ({CHECKS} checks, 10 keys, 1 thread, limit 1000/s)");
-    println!("{}", build_profile());
-    println!("each sample times one call with Instant, so it includes timer overhead");
-    println!(
-        "{:<15} {:>9} {:>9} {:>9}",
-        "algorithm", "p50 ns", "p95 ns", "p99 ns"
-    );
-    for algorithm in Algorithm::ALL {
-        let l = limiter(algorithm, 1_000);
-        let mut samples: Vec<u128> = (0..CHECKS)
-            .map(|i| {
-                let start = Instant::now();
-                black_box(l.check(&keys[i % keys.len()], Cost::ONE));
-                start.elapsed().as_nanos()
-            })
-            .collect();
-        samples.sort_unstable();
-        let pct = |p: usize| samples[(samples.len() * p / 100).min(samples.len() - 1)];
-        println!(
-            "{:<15} {:>9} {:>9} {:>9}",
-            algorithm.name(),
-            pct(50),
-            pct(95),
-            pct(99)
-        );
-    }
+    let text =
+        std::fs::read_to_string(readme).with_context(|| format!("read {}", readme.display()))?;
+    let updated = report::splice_readme(&text, &report::readme_block(&inputs))?;
+    std::fs::write(readme, updated).with_context(|| format!("write {}", readme.display()))?;
+    eprintln!("updated {}", readme.display());
+    Ok(())
 }
