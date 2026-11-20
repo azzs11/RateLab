@@ -3,12 +3,14 @@
 <div align="center">
 
 [![Rust CI](https://github.com/azzs11/distributed-rate-limiter/actions/workflows/rust.yml/badge.svg)](https://github.com/azzs11/distributed-rate-limiter/actions/workflows/rust.yml)
+[![crates.io](https://img.shields.io/crates/v/ratelab.svg)](https://crates.io/crates/ratelab)
+[![docs.rs](https://img.shields.io/docsrs/ratelab)](https://docs.rs/ratelab)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 ![Stars](https://img.shields.io/github/stars/azzs11/distributed-rate-limiter?style=social)
 
 **Rate limiting algorithms in Rust (token bucket, leaky bucket, fixed and sliding window, GCRA), shared across nodes through Redis, with a benchmark that reproduces every number below.**
 
-**[Open the playground](https://azzs11.github.io/distributed-rate-limiter/)**: the real library, compiled to WebAssembly, running in your browser.
+**[Open the playground](https://azzs11.github.io/distributed-rate-limiter/)**: the real library, compiled to WebAssembly, running in your browser. The library is on crates.io as [`ratelab`](https://crates.io/crates/ratelab), with [API docs on docs.rs](https://docs.rs/ratelab).
 
 [Playground](#playground) • [Features](#features) • [Quick Start](#quick-start) • [Benchmarks](#benchmarks) • [Roadmap](#roadmap)
 
@@ -176,12 +178,14 @@ current limit in `x-drl-concurrency-limit`. Both algorithms follow Netflix's
 
 | Crate | What it holds |
 |-------|---------------|
-| `crates/core` (`ratelab`) | Algorithms, coordination strategies, `Clock`, `Decision`, circuit breaker, unit newtypes. No I/O. |
+| `crates/core` (`ratelab`, [on crates.io](https://crates.io/crates/ratelab)) | Algorithms, coordination strategies, concurrency limits, token budgets, `Clock`, `Decision`, circuit breaker, unit newtypes. No I/O. |
 | `crates/redis-store` (`drl-redis-store`) | Redis token bucket (Lua, EVALSHA, Redis `TIME`) and `GuardedLimiter` |
 | `crates/server` | Axum server with the Tower layer (`web-server`, serves the built playground), demo binary (`demo`) |
 | `crates/sim` | Deterministic traffic scenarios and the multi-node cluster simulator |
 | `crates/wasm` | wasm-bindgen bindings: live limiter, traffic, lab traces, cluster simulator, log replay |
 | `crates/bench` | Exact oracle, measurement suite, load generator, RESULTS.md writer, Criterion benches |
+| `crates/cli` (`ratelab-cli`) | The `ratelab` command: simulate, replay a log, quick benchmark |
+| `examples/axum-api` | A small Axum API using the published crate: a rate limit per API key and a concurrency limit |
 | `deploy/` | Dockerfile and Docker Compose: 3 nodes, Redis, load generator |
 | `web/` | The playground: Vite + TypeScript + the WebAssembly module, deployed to GitHub Pages |
 
@@ -238,7 +242,42 @@ Building it needs the wasm32 target and `wasm-bindgen-cli` at the crate's versio
 - [just](https://github.com/casey/just) (optional): `cargo install just --locked`
 - Node.js 24 (optional): for the playground in `web/`
 
-### Installation
+### Use the library
+
+```bash
+cargo add ratelab
+```
+
+```rust
+use ratelab::{Cost, Gcra, RateLimitConfig, RateLimiter};
+
+let limiter = Gcra::new(RateLimitConfig::per_second(100)?);
+if !limiter.check("user_42", Cost::ONE).allowed {
+    // answer 429
+}
+```
+
+The [API docs](https://docs.rs/ratelab) have a runnable example for every public
+function. [`examples/axum-api`](examples/axum-api/src/lib.rs) shows a whole service in
+about a hundred lines: a rate limit per API key with the IETF headers, and a Gradient2
+concurrency limit in front of it (`cargo run -p axum-api-example`).
+
+### The `ratelab` command
+
+```bash
+cargo install --git https://github.com/azzs11/distributed-rate-limiter ratelab-cli
+
+ratelab simulate --traffic boundary_attack            # every algorithm on one attack
+ratelab simulate --nodes 3 --traffic steady --keys 10 # every coordination strategy
+ratelab replay access.log.gz --window 1m --target 1   # choose a limit from your traffic
+ratelab bench --threads 4                             # quick speed check on this machine
+```
+
+`replay` reads nginx/Apache logs, CSV with a header, or JSON Lines (from a file,
+gzipped or not, or `-` for stdin), and recommends the smallest limit per caller at
+which the exact rule blocks no more than your target share of requests.
+
+### Build from source
 
 ```bash
 git clone https://github.com/azzs11/distributed-rate-limiter.git

@@ -54,6 +54,25 @@ jobs:
     - name: Test on the minimum supported Rust version
       run: cargo test --locked --workspace
 
+  crate:
+    name: ratelab crate (docs and packaging)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Docs build without warnings or broken links
+      env:
+        RUSTDOCFLAGS: -D warnings
+      run: cargo doc --locked -p ratelab --no-deps
+
+    - name: Packaging dry run (what crates.io would build)
+      run: cargo publish --locked -p ratelab --dry-run
+
   wasm:
     name: wasm32 build
     runs-on: ubuntu-latest

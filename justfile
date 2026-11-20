@@ -70,6 +70,18 @@ cluster-strategies quick="false":
     trap "docker compose $files down --rmi all --volumes --remove-orphans >/dev/null 2>&1; docker image prune -f >/dev/null 2>&1" EXIT
     docker compose $files up --build --abort-on-container-exit --exit-code-from loadgen
 
+# Check the ratelab crate is ready to publish: strict docs, doc tests, a packaging dry
+# run, and (once a version is on crates.io) cargo-semver-checks against it.
+release-check:
+    RUSTDOCFLAGS="-D warnings" cargo doc -p ratelab --no-deps
+    cargo test -p ratelab --doc
+    cargo publish -p ratelab --dry-run
+    if command -v cargo-semver-checks >/dev/null; then cargo semver-checks -p ratelab; else echo "cargo-semver-checks not installed: cargo install cargo-semver-checks --locked"; fi
+
+# Install the ratelab command from this checkout.
+cli:
+    cargo install --path crates/cli --locked
+
 # Free the rebuildable caches: Rust build output and Docker's build cache (all of it).
 clean:
     cargo clean

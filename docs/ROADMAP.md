@@ -18,7 +18,7 @@ order: **0 → 1 → 2 → 3 → 6 → 4 → 5 → 7 → 8**.
 | 4 | Adaptive concurrency | AIMD and Gradient2 concurrency limits as a Tower layer, measured against no limit and a static limit under an overload ramp and a capacity change. |
 | 5 | Token-aware LLM limits | Input and output token budgets with per-model weights; estimate-only, reserve-max and admit-then-reconcile with debt, measured on a real LLM trace. |
 | 6 | Playground + UI | Compile the algorithms to WASM for an in-browser playground, and rebuild the dashboard on real, measured data. |
-| 7 | Publish crate | Clean up the public API and documentation, then publish to crates.io. |
+| 7 | Publish crate | The core crate as `ratelab` on crates.io with a runnable example for every public function, an Axum example app and the `ratelab` command line. |
 | 8 | Story / report | Write up the method and the measured results. |
 
 ## Rules
