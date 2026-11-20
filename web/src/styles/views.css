@@ -558,3 +558,101 @@ td.lead {
   font-weight: 700;
   color: var(--accent);
 }
+
+/* ---------- Replay ---------- */
+
+.drop {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-2);
+  padding: var(--s-7) var(--s-5);
+  border: 2px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--bg);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease);
+}
+
+.drop svg {
+  width: 28px;
+  height: 28px;
+  color: var(--accent);
+}
+
+.drop:hover,
+.drop.over {
+  border-color: var(--accent);
+}
+
+#log-file:focus-visible + .drop,
+.drop:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.drop-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--step-2);
+}
+
+.replay-step {
+  font-size: var(--step-2);
+  margin-bottom: var(--s-3);
+}
+
+.replay-cols {
+  padding: 0 0 var(--s-4);
+  border-bottom: 0;
+}
+
+.replay-mapping {
+  display: grid;
+  gap: var(--s-4);
+}
+
+.replay-mapping:empty,
+.replay-results:empty {
+  display: none;
+}
+
+.replay-results {
+  display: grid;
+  gap: var(--s-5);
+}
+
+.replay-reco {
+  display: grid;
+  gap: var(--s-2);
+}
+
+.replay-reco p {
+  margin: 0;
+}
+
+.replay-big {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--step-2);
+}
+
+.replay-big .num {
+  font-family: var(--font-mono);
+  font-style: normal;
+  color: var(--accent);
+}
+
+.replay-stats {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+td.over {
+  color: var(--blocked);
+  font-weight: 700;
+}
+
+.replay-page {
+  padding-bottom: var(--s-8);
+}
