@@ -1,12 +1,14 @@
 use drl_core::{Algorithm, Cost, MonotonicClock, RateLimitConfig, RateLimiter};
 use drl_redis_store::RedisRateLimiter;
-use server::metrics::{self, record_request};
-use std::time::{Duration, Instant};
+use server::metrics::Stats;
+use std::sync::LazyLock;
+use std::time::Duration;
+
+/// Totals across every section of the demo.
+static STATS: LazyLock<Stats> = LazyLock::new(Stats::default);
 
 #[tokio::main]
 async fn main() {
-    metrics::init_metrics();
-
     println!("🚀 Distributed Rate Limiter - Demo");
     println!("======================================\n");
 
@@ -52,13 +54,13 @@ async fn main() {
     println!("\n");
     println!("✨ Demo complete.");
 
-    metrics::print_metrics_summary();
+    let (allowed, blocked) = STATS.totals();
+    println!("\nSUMMARY");
+    println!("=======");
+    println!("Allowed: {allowed}");
+    println!("Blocked: {blocked}");
 
-    println!("\n💡 Measure throughput on your machine: cargo bench");
-
-    println!("\n🔍 Prometheus Metrics Format:");
-    println!("==============================");
-    println!("{}", metrics::get_metrics());
+    println!("\n💡 Measure on your machine: cargo run -p bench --release -- local");
 }
 
 fn show(i: u32, allowed: bool) {
@@ -72,9 +74,8 @@ fn show(i: u32, allowed: bool) {
 
 async fn run_algorithm(limiter: &dyn RateLimiter) {
     for i in 1..=5 {
-        let start = Instant::now();
         let allowed = limiter.check("user_test", Cost::ONE).allowed;
-        record_request(allowed, start);
+        STATS.count(allowed);
         show(i, allowed);
     }
 
@@ -82,9 +83,8 @@ async fn run_algorithm(limiter: &dyn RateLimiter) {
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     for i in 1..=2 {
-        let start = Instant::now();
         let allowed = limiter.check("user_test", Cost::ONE).allowed;
-        record_request(allowed, start);
+        STATS.count(allowed);
         show(i, allowed);
     }
 }
@@ -105,10 +105,9 @@ async fn run_redis(config: RateLimitConfig) {
     println!("   ✅ Connected to Redis\n");
 
     for i in 1..=5 {
-        let start = Instant::now();
         match limiter.check("user_redis", Cost::ONE).await {
             Ok(decision) => {
-                record_request(decision.allowed, start);
+                STATS.count(decision.allowed);
                 show(i, decision.allowed);
             }
             Err(_) => {

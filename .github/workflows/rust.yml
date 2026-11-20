@@ -87,4 +87,4 @@ jobs:
 
     # The tests start their own Redis container through the runner's Docker.
     - name: Run tests that need Docker
-      run: cargo test --locked -p drl-redis-store -- --ignored
+      run: cargo test --locked --workspace -- --ignored

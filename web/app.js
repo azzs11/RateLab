@@ -91,7 +91,7 @@ document.getElementById('test-requests').addEventListener('input', (e) => {
 // Fetch and update metrics
 async function fetchMetrics() {
     try {
-        const response = await fetch('http://localhost:3001/api/metrics');
+        const response = await fetch('/api/metrics');
         const data = await response.json();
         
         // Update metric cards
@@ -136,7 +136,7 @@ document.getElementById('run-test').addEventListener('click', async () => {
     };
     
     try {
-        const response = await fetch('http://localhost:3001/api/test', {
+        const response = await fetch('/api/test', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

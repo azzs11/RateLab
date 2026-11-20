@@ -1,100 +1,84 @@
-use prometheus::{Encoder, Histogram, IntCounter, Registry, TextEncoder};
-use std::sync::LazyLock;
-use std::time::Instant;
+//! Metrics through the `metrics` crate, exported in Prometheus text format.
+//!
+//! - `drl_decisions_total{policy, outcome, source}`: counter, `outcome` is
+//!   `allowed` or `blocked`, `source` is a [`DecisionSource`] name.
+//! - `drl_decision_seconds{source}`: histogram of time spent deciding.
+//!
+//! [`Stats`] keeps plain totals for the dashboard's `/api/metrics`.
 
-/// Global metrics registry
-pub static REGISTRY: LazyLock<Registry> = LazyLock::new(Registry::new);
+use crate::backend::DecisionSource;
+use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 
-/// Total requests processed
-pub static REQUESTS_TOTAL: LazyLock<IntCounter> = LazyLock::new(|| {
-    IntCounter::new(
-        "rate_limiter_requests_total",
-        "Total number of requests processed",
-    )
-    .expect("metric can be created")
-});
+/// Histogram buckets for decision time, in seconds (1 µs to 100 ms).
+const DECISION_BUCKETS: &[f64] = &[
+    0.000_001, 0.000_005, 0.000_01, 0.000_05, 0.000_1, 0.000_5, 0.001, 0.005, 0.01, 0.05, 0.1,
+];
 
-/// Requests allowed
-pub static REQUESTS_ALLOWED: LazyLock<IntCounter> = LazyLock::new(|| {
-    IntCounter::new(
-        "rate_limiter_requests_allowed",
-        "Number of requests allowed",
-    )
-    .expect("metric can be created")
-});
-
-/// Requests blocked
-pub static REQUESTS_BLOCKED: LazyLock<IntCounter> = LazyLock::new(|| {
-    IntCounter::new(
-        "rate_limiter_requests_blocked",
-        "Number of requests blocked",
-    )
-    .expect("metric can be created")
-});
-
-/// Request processing latency
-pub static REQUEST_LATENCY: LazyLock<Histogram> = LazyLock::new(|| {
-    Histogram::with_opts(
-        prometheus::HistogramOpts::new(
-            "rate_limiter_request_duration_seconds",
-            "Request processing latency in seconds",
-        )
-        .buckets(vec![0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1]),
-    )
-    .expect("metric can be created")
-});
-
-/// Initialize metrics registry
-pub fn init_metrics() {
-    REGISTRY
-        .register(Box::new(REQUESTS_TOTAL.clone()))
-        .expect("collector can be registered");
-    REGISTRY
-        .register(Box::new(REQUESTS_ALLOWED.clone()))
-        .expect("collector can be registered");
-    REGISTRY
-        .register(Box::new(REQUESTS_BLOCKED.clone()))
-        .expect("collector can be registered");
-    REGISTRY
-        .register(Box::new(REQUEST_LATENCY.clone()))
-        .expect("collector can be registered");
+/// Installs the global Prometheus recorder and returns the handle `/metrics` renders.
+pub fn install() -> anyhow::Result<PrometheusHandle> {
+    Ok(PrometheusBuilder::new()
+        .set_buckets(DECISION_BUCKETS)?
+        .install_recorder()?)
 }
 
-/// Record a rate limit check
-pub fn record_request(allowed: bool, start: Instant) {
-    let duration = start.elapsed().as_secs_f64();
+/// Records one decision.
+pub fn record(policy: &str, allowed: bool, source: DecisionSource, elapsed: Duration) {
+    let outcome = if allowed { "allowed" } else { "blocked" };
+    metrics::counter!(
+        "drl_decisions_total",
+        "policy" => policy.to_owned(),
+        "outcome" => outcome,
+        "source" => source.name()
+    )
+    .increment(1);
+    metrics::histogram!("drl_decision_seconds", "source" => source.name())
+        .record(elapsed.as_secs_f64());
+}
 
-    REQUESTS_TOTAL.inc();
-    if allowed {
-        REQUESTS_ALLOWED.inc();
-    } else {
-        REQUESTS_BLOCKED.inc();
+/// Running totals for the dashboard.
+#[derive(Debug, Default)]
+pub struct Stats {
+    allowed: AtomicU64,
+    blocked: AtomicU64,
+}
+
+impl Stats {
+    /// Counts one decision.
+    pub fn count(&self, allowed: bool) {
+        let counter = if allowed {
+            &self.allowed
+        } else {
+            &self.blocked
+        };
+        counter.fetch_add(1, Ordering::Relaxed);
     }
-    REQUEST_LATENCY.observe(duration);
+
+    /// `(allowed, blocked)` so far.
+    pub fn totals(&self) -> (u64, u64) {
+        (
+            self.allowed.load(Ordering::Relaxed),
+            self.blocked.load(Ordering::Relaxed),
+        )
+    }
 }
 
-/// Get metrics in Prometheus format
-pub fn get_metrics() -> String {
-    let encoder = TextEncoder::new();
-    let metric_families = REGISTRY.gather();
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let mut buffer = Vec::new();
-    encoder.encode(&metric_families, &mut buffer).unwrap();
-    String::from_utf8(buffer).unwrap()
-}
+    #[test]
+    fn stats_count_both_outcomes() {
+        let s = Stats::default();
+        s.count(true);
+        s.count(true);
+        s.count(false);
+        assert_eq!(s.totals(), (2, 1));
+    }
 
-/// Print metrics summary to console
-pub fn print_metrics_summary() {
-    println!("\n📊 METRICS SUMMARY");
-    println!("==================");
-    println!("Total Requests:   {}", REQUESTS_TOTAL.get());
-    println!("Allowed:          {} ✅", REQUESTS_ALLOWED.get());
-    println!("Blocked:          {} ❌", REQUESTS_BLOCKED.get());
-
-    let allow_rate = if REQUESTS_TOTAL.get() > 0 {
-        (REQUESTS_ALLOWED.get() as f64 / REQUESTS_TOTAL.get() as f64) * 100.0
-    } else {
-        0.0
-    };
-    println!("Allow Rate:       {:.1}%", allow_rate);
+    #[test]
+    fn recording_without_a_recorder_is_a_no_op() {
+        record("p", true, DecisionSource::Local, Duration::from_micros(3));
+    }
 }

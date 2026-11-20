@@ -1,118 +1,171 @@
-use actix_cors::Cors;
-use actix_files as fs;
-use actix_web::{App, HttpResponse, HttpServer, Result, get, post, web};
-use serde::{Deserialize, Serialize};
-use std::time::Instant;
+//! Rate limited HTTP server and dashboard.
+//!
+//! ```text
+//! cargo run -p server --bin web-server                         # in-process limiter
+//! cargo run -p server --bin web-server -- --backend redis      # shared through Redis
+//! ```
+//!
+//! Every flag can also be set by environment variable (`DRL_BACKEND`, `DRL_LIMIT`, ...).
 
-use drl_core::{Algorithm, Cost, MonotonicClock, RateLimitConfig};
-use server::metrics;
+use anyhow::{Context, bail};
+use clap::{Parser, ValueEnum};
+use drl_core::{Algorithm, BreakerConfig, CircuitBreaker, MonotonicClock, RateLimitConfig};
+use drl_redis_store::{GuardedLimiter, RedisOptions, RedisRateLimiter};
+use server::backend::Backend;
+use server::layer::Limits;
+use server::{app, metrics};
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
+use tracing_subscriber::EnvFilter;
 
-#[derive(Serialize)]
-struct MetricsResponse {
-    total: u64,
-    allowed: u64,
-    blocked: u64,
-    allow_rate: f64,
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum BackendKind {
+    /// In-process state (one node).
+    Local,
+    /// State in Redis, shared by every node.
+    Redis,
 }
 
-#[derive(Deserialize)]
-struct TestRequest {
+#[derive(Debug, Parser)]
+#[command(about = "Rate limited HTTP server with IETF RateLimit headers")]
+struct Args {
+    /// Address to listen on.
+    #[arg(long, env = "DRL_BIND", default_value = "127.0.0.1:3001")]
+    bind: SocketAddr,
+    /// Name sent in the x-drl-node header.
+    #[arg(long, env = "DRL_NODE_ID", default_value = "local")]
+    node_id: String,
+    /// Where limiter state lives.
+    #[arg(long, value_enum, env = "DRL_BACKEND", default_value = "local")]
+    backend: BackendKind,
+    /// Algorithm for the local backend (the Redis backend is a token bucket).
+    #[arg(long, env = "DRL_ALGORITHM", default_value = "token_bucket")]
     algorithm: String,
-    max_requests: u64,
-    window_seconds: u64,
-    num_requests: u32,
+    /// Units allowed per window, per caller and route.
+    #[arg(long, env = "DRL_LIMIT", default_value_t = 100)]
+    limit: u64,
+    /// Window length in milliseconds.
+    #[arg(long, env = "DRL_WINDOW_MS", default_value_t = 1000)]
+    window_ms: u64,
+    /// Redis URL for the Redis backend.
+    #[arg(long, env = "DRL_REDIS_URL", default_value = "redis://127.0.0.1:6379/")]
+    redis_url: String,
+    /// Redis reply timeout in milliseconds; a timeout counts as a breaker failure.
+    #[arg(long, env = "DRL_REDIS_TIMEOUT_MS", default_value_t = 100)]
+    redis_timeout_ms: u64,
+    /// Consecutive Redis failures that open the circuit breaker.
+    #[arg(long, env = "DRL_BREAKER_FAILURES", default_value_t = 5)]
+    breaker_failures: u32,
+    /// How long the breaker stays open, in milliseconds.
+    #[arg(long, env = "DRL_BREAKER_OPEN_MS", default_value_t = 1000)]
+    breaker_open_ms: u64,
+    /// Directory with the dashboard's static files.
+    #[arg(long, env = "DRL_WEB_DIR", default_value = "web")]
+    web_dir: PathBuf,
 }
 
-#[derive(Serialize)]
-struct TestResponse {
-    allowed: u32,
-    blocked: u32,
-    duration_ms: f64,
-    requests_per_sec: f64,
-    results: Vec<bool>,
-}
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
+        .init();
+    let args = Args::parse();
+    let prometheus = metrics::install()?;
 
-#[get("/")]
-async fn index() -> Result<fs::NamedFile> {
-    Ok(fs::NamedFile::open("web/index.html")?)
-}
-
-#[get("/api/metrics")]
-async fn get_metrics() -> Result<HttpResponse> {
-    let total = metrics::REQUESTS_TOTAL.get();
-    let allowed = metrics::REQUESTS_ALLOWED.get();
-    let blocked = metrics::REQUESTS_BLOCKED.get();
-
-    let allow_rate = if total > 0 {
-        (allowed as f64 / total as f64) * 100.0
-    } else {
-        0.0
+    let config = RateLimitConfig::new(args.limit, Duration::from_millis(args.window_ms))
+        .context("invalid --limit / --window-ms")?;
+    let algorithm: Algorithm = args.algorithm.parse()?;
+    let backend = match args.backend {
+        BackendKind::Local => Backend::Local {
+            limiter: algorithm.build(config, MonotonicClock::new()),
+            config,
+        },
+        BackendKind::Redis => {
+            if algorithm != Algorithm::TokenBucket {
+                bail!("the Redis backend implements token_bucket only");
+            }
+            Backend::Redis(connect_redis(&args, config).await?)
+        }
     };
+    tracing::info!(
+        node = %args.node_id,
+        backend = backend.name(),
+        algorithm = algorithm.name(),
+        limit = config.limit(),
+        window_ms = args.window_ms,
+        "starting"
+    );
 
-    Ok(HttpResponse::Ok().json(MetricsResponse {
-        total,
-        allowed,
-        blocked,
-        allow_rate,
-    }))
+    let limits = Arc::new(Limits {
+        backend,
+        stats: Default::default(),
+        node_id: args.node_id,
+    });
+    let router = app::router(limits, Some(prometheus), &args.web_dir);
+    let listener = tokio::net::TcpListener::bind(args.bind)
+        .await
+        .with_context(|| format!("bind {}", args.bind))?;
+    tracing::info!("listening on http://{}", args.bind);
+    axum::serve(
+        listener,
+        router.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown())
+    .await?;
+    Ok(())
 }
 
-#[post("/api/test")]
-async fn test_rate_limiter(req: web::Json<TestRequest>) -> Result<HttpResponse> {
-    let algorithm: Algorithm = match req.algorithm.parse() {
-        Ok(a) => a,
-        Err(e) => return Ok(HttpResponse::BadRequest().body(e.to_string())),
+/// Connects to Redis, retrying for a few seconds while it starts up.
+async fn connect_redis(
+    args: &Args,
+    config: RateLimitConfig,
+) -> anyhow::Result<GuardedLimiter<MonotonicClock>> {
+    let options = RedisOptions {
+        response_timeout: Duration::from_millis(args.redis_timeout_ms),
+        ..RedisOptions::default()
     };
-    let config = match RateLimitConfig::new(
-        req.max_requests,
-        std::time::Duration::from_secs(req.window_seconds),
-    ) {
-        Ok(c) => c,
-        Err(e) => return Ok(HttpResponse::BadRequest().body(e.to_string())),
+    let mut attempt = 0;
+    let store = loop {
+        match RedisRateLimiter::connect_with(&args.redis_url, config, options.clone()).await {
+            Ok(store) => break store,
+            Err(e) if attempt < 20 => {
+                attempt += 1;
+                tracing::warn!(error = %e, attempt, "Redis not reachable yet, retrying");
+                tokio::time::sleep(Duration::from_millis(250)).await;
+            }
+            Err(e) => return Err(e).context("connect to Redis"),
+        }
     };
-    let limiter = algorithm.build(config, MonotonicClock::new());
+    let breaker_config = BreakerConfig::new(
+        args.breaker_failures,
+        Duration::from_millis(args.breaker_open_ms),
+    )?;
+    Ok(GuardedLimiter::new(
+        store,
+        CircuitBreaker::new(breaker_config, MonotonicClock::new()),
+    ))
+}
 
-    let start = Instant::now();
-    let mut results = Vec::with_capacity(req.num_requests as usize);
-    for _ in 0..req.num_requests {
-        let req_start = Instant::now();
-        let allowed = limiter.check("test_user", Cost::ONE).allowed;
-        metrics::record_request(allowed, req_start);
-        results.push(allowed);
+async fn shutdown() {
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut s) => {
+                s.recv().await;
+            }
+            Err(_) => std::future::pending::<()>().await,
+        }
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+    tokio::select! {
+        () = ctrl_c => {},
+        () = terminate => {},
     }
-
-    let duration = start.elapsed();
-    let allowed = results.iter().filter(|&&a| a).count() as u32;
-    Ok(HttpResponse::Ok().json(TestResponse {
-        allowed,
-        blocked: req.num_requests - allowed,
-        duration_ms: duration.as_secs_f64() * 1000.0,
-        requests_per_sec: req.num_requests as f64 / duration.as_secs_f64(),
-        results,
-    }))
-}
-
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    // Initialize metrics
-    metrics::init_metrics();
-
-    println!("🚀 Starting Rate Limiter Web Dashboard");
-    println!("📊 Dashboard: http://localhost:3001");
-    println!("📈 Metrics API: http://localhost:3001/api/metrics");
-    println!("\nPress Ctrl+C to stop\n");
-
-    HttpServer::new(|| {
-        let cors = Cors::permissive();
-
-        App::new()
-            .wrap(cors)
-            .service(index)
-            .service(get_metrics)
-            .service(test_rate_limiter)
-            .service(fs::Files::new("/", "web").index_file("index.html"))
-    })
-    .bind(("127.0.0.1", 3001))?
-    .run()
-    .await
+    tracing::info!("shutting down");
 }
