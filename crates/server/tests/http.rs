@@ -13,7 +13,13 @@ use std::sync::Arc;
 use std::time::Duration;
 use tower::ServiceExt;
 
-const WEB_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../web");
+/// A stand-in for the built playground.
+fn web_dir() -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("drl-web-test-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("index.html"), "<!doctype html><title>t</title>").unwrap();
+    dir
+}
 
 /// 3 per minute: one token refills every 20 s.
 fn setup() -> (Router, Arc<ManualClock>) {
@@ -27,7 +33,7 @@ fn setup() -> (Router, Arc<ManualClock>) {
         stats: Default::default(),
         node_id: "node-test".to_owned(),
     });
-    (app::router(limits, None, WEB_DIR), clock)
+    (app::router(limits, None, web_dir()), clock)
 }
 
 fn get(path: &str, api_key: &str) -> Request<Body> {
@@ -132,51 +138,23 @@ async fn health_and_metrics_are_not_limited() {
 }
 
 #[tokio::test]
-async fn dashboard_api_counts_decisions() {
+async fn metrics_api_counts_decisions() {
     let (app, _clock) = setup();
-    app.clone()
-        .oneshot(get("/api/hello", "frank"))
-        .await
-        .unwrap();
-    let test = Request::post("/api/test")
-        .header("content-type", "application/json")
-        .body(Body::from(
-            r#"{"algorithm":"gcra","max_requests":4,"window_seconds":1,"num_requests":6}"#,
-        ))
-        .unwrap();
-    let r = app.clone().oneshot(test).await.unwrap();
-    assert_eq!(r.status(), StatusCode::OK);
-    let body = body_json(r).await;
-    assert_eq!(body["allowed"], 4);
-    assert_eq!(body["blocked"], 2);
-
+    for _ in 0..4 {
+        app.clone()
+            .oneshot(get("/api/hello", "frank"))
+            .await
+            .unwrap();
+    }
     let r = app.oneshot(get("/api/metrics", "frank")).await.unwrap();
     let m = body_json(r).await;
-    assert_eq!(m["total"], 7);
-    assert_eq!(m["allowed"], 5);
-    assert_eq!(m["blocked"], 2);
+    assert_eq!(m["total"], 4);
+    assert_eq!(m["allowed"], 3);
+    assert_eq!(m["blocked"], 1);
 }
 
 #[tokio::test]
-async fn dashboard_rejects_bad_input() {
-    let (app, _clock) = setup();
-    for body in [
-        r#"{"algorithm":"nope","max_requests":4,"window_seconds":1,"num_requests":1}"#,
-        r#"{"algorithm":"gcra","max_requests":0,"window_seconds":1,"num_requests":1}"#,
-        r#"{"algorithm":"gcra","max_requests":4,"window_seconds":0,"num_requests":1}"#,
-        r#"{"algorithm":"gcra","max_requests":4,"window_seconds":1,"num_requests":100001}"#,
-    ] {
-        let req = Request::post("/api/test")
-            .header("content-type", "application/json")
-            .body(Body::from(body))
-            .unwrap();
-        let r = app.clone().oneshot(req).await.unwrap();
-        assert_eq!(r.status(), StatusCode::BAD_REQUEST, "{body}");
-    }
-}
-
-#[tokio::test]
-async fn serves_the_dashboard_files() {
+async fn serves_the_built_playground() {
     let (app, _clock) = setup();
     let r = app
         .oneshot(Request::get("/").body(Body::empty()).unwrap())

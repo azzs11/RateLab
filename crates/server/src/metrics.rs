@@ -4,7 +4,7 @@
 //!   `allowed` or `blocked`, `source` is a [`DecisionSource`] name.
 //! - `drl_decision_seconds{source}`: histogram of time spent deciding.
 //!
-//! [`Stats`] keeps plain totals for the dashboard's `/api/metrics`.
+//! [`Stats`] keeps plain totals for `/api/metrics`.
 
 use crate::backend::DecisionSource;
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
@@ -37,7 +37,7 @@ pub fn record(policy: &str, allowed: bool, source: DecisionSource, elapsed: Dura
         .record(elapsed.as_secs_f64());
 }
 
-/// Running totals for the dashboard.
+/// Running totals for `/api/metrics`.
 #[derive(Debug, Default)]
 pub struct Stats {
     allowed: AtomicU64,

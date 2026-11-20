@@ -11,10 +11,9 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 
 FROM debian:trixie-slim
 COPY --from=build /usr/local/bin/web-server /usr/local/bin/loadgen /usr/local/bin/
-COPY web /app/web
 WORKDIR /app
-ENV DRL_WEB_DIR=/app/web \
-    DRL_BIND=0.0.0.0:3001
+# The nodes serve the API only; the playground is a static site (GitHub Pages).
+ENV DRL_BIND=0.0.0.0:3001
 EXPOSE 3001
 USER nobody
 CMD ["web-server"]

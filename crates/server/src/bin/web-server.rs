@@ -61,8 +61,9 @@ struct Args {
     /// How long the breaker stays open, in milliseconds.
     #[arg(long, env = "DRL_BREAKER_OPEN_MS", default_value_t = 1000)]
     breaker_open_ms: u64,
-    /// Directory with the dashboard's static files.
-    #[arg(long, env = "DRL_WEB_DIR", default_value = "web")]
+    /// Directory with the built playground (`cd web && npm run build`). Static files are
+    /// served from here when it exists.
+    #[arg(long, env = "DRL_WEB_DIR", default_value = "web/dist")]
     web_dir: PathBuf,
 }
 
@@ -103,6 +104,12 @@ async fn main() -> anyhow::Result<()> {
         stats: Default::default(),
         node_id: args.node_id,
     });
+    if !args.web_dir.is_dir() {
+        tracing::info!(
+            dir = %args.web_dir.display(),
+            "no built playground found; serving the API only (build it with `just site`)"
+        );
+    }
     let router = app::router(limits, Some(prometheus), &args.web_dir);
     let listener = tokio::net::TcpListener::bind(args.bind)
         .await
