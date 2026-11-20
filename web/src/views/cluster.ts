@@ -139,9 +139,14 @@ function run(core: Core, p: Params): Result {
 
 function nodePositions(n: number, w: number, hgt: number): { x: number; y: number }[] {
   const out: { x: number; y: number }[] = [];
+  if (w < 600) {
+    // Narrow screens: one straight row under the store.
+    for (let i = 0; i < n; i++) out.push({ x: (w * (i + 0.5)) / n, y: hgt * 0.62 });
+    return out;
+  }
   const cx = w / 2;
   const cy = hgt * 0.36;
-  const rx = Math.min(w * 0.4, 420);
+  const rx = Math.min(w * 0.44, 420);
   const ry = hgt * 0.42;
   for (let i = 0; i < n; i++) {
     // Spread along the lower half of an ellipse around the store.
@@ -205,26 +210,29 @@ function drawCluster(ctx: CanvasRenderingContext2D, w: number, hgt: number, r: R
   const si = Math.max(0, upperIndex(r.sampleAt, t));
   const recentFrom = upperIndex(r.at, t - 250) + 1;
   const recentTo = upperIndex(r.at, t);
+  // Node boxes shrink on narrow screens so neighbours never overlap.
+  const boxW = Math.max(40, Math.min(92, (w < 600 ? w : w * 0.85) / p.nodes - 6));
+  const half = boxW / 2;
   nodes.forEach((n, i) => {
     const held = r.held[si * p.nodes + i] ?? 0;
     ctx.fillStyle = c.surface;
     ctx.strokeStyle = c.lineStrong;
     ctx.beginPath();
-    ctx.roundRect(n.x - 46, n.y - 18, 92, 54, 8);
+    ctx.roundRect(n.x - half, n.y - 18, boxW, 54, 8);
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = c.ink;
     ctx.font = `600 12px ${c.text}`;
-    ctx.fillText(`Node ${i + 1}`, n.x, n.y - 2);
+    ctx.fillText(boxW < 70 ? `${i + 1}` : `Node ${i + 1}`, n.x, n.y - 2);
     // Held tokens bar (relative to the limit).
     const frac = Math.min(1, held / Math.max(1, p.limit));
     ctx.fillStyle = c.surface2;
-    ctx.fillRect(n.x - 36, n.y + 8, 72, 8);
+    ctx.fillRect(n.x - half + 8, n.y + 8, boxW - 16, 8);
     ctx.fillStyle = c.accent;
-    ctx.fillRect(n.x - 36, n.y + 8, 72 * frac, 8);
+    ctx.fillRect(n.x - half + 8, n.y + 8, (boxW - 16) * frac, 8);
     ctx.fillStyle = c.muted;
     ctx.font = `10px ${c.mono}`;
-    ctx.fillText(`holds ${held}`, n.x, n.y + 30);
+    ctx.fillText(boxW < 70 ? `${held}` : `holds ${held}`, n.x, n.y + 30);
   });
   // Recent requests fall into their node.
   for (let k = recentFrom; k <= recentTo; k++) {

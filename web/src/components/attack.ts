@@ -122,9 +122,6 @@ export function attackFigure(core: Core): { el: HTMLElement; dispose: () => void
         ctx.moveTo(padL, base + 4);
         ctx.lineTo(width - padR, base + 4);
         ctx.stroke();
-        ctx.fillStyle = p.ink2;
-        ctx.font = `600 11px ${p.text}`;
-        ctx.fillText(pretty(lane.name), padL + 4, top + 14);
         const r = Math.max(2.2, Math.min(3.6, (laneH - 24) / (LIMIT * 2.3)));
         const gap = r * 2.25;
         for (let i = 0; i < lane.at.length && lane.at[i] <= t; i++) {
@@ -138,6 +135,18 @@ export function attackFigure(core: Core): { el: HTMLElement; dispose: () => void
           const yy = base - lane.stack[i] * gap - r;
           mark(ctx, xx, yy, r, ok, p.allowed, p.blocked);
         }
+      });
+      // Lane labels on a pill, drawn last so the marks never cover them.
+      ctx.font = `600 11px ${p.text}`;
+      lanes.forEach((lane, li) => {
+        const label = pretty(lane.name);
+        const tw = ctx.measureText(label).width;
+        ctx.fillStyle = p.surface;
+        ctx.globalAlpha = 0.92;
+        ctx.fillRect(padL + 1, li * laneH + 3, tw + 8, 16);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = p.ink2;
+        ctx.fillText(label, padL + 5, li * laneH + 15);
       });
       // Playhead.
       ctx.strokeStyle = p.accent;

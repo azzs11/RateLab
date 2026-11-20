@@ -329,7 +329,19 @@ pre code {
     display: none;
   }
   .site-header .page {
-    gap: var(--s-3);
+    flex-wrap: wrap;
+    gap: 0 var(--s-3);
+    padding-block: var(--s-2);
+  }
+  .site-header .icon-btn {
+    margin-left: auto;
+  }
+  .nav {
+    order: 3;
+    width: 100%;
+    margin: 0 calc(-1 * var(--gutter));
+    padding: var(--s-2) var(--gutter) 0;
+    box-sizing: content-box;
   }
 }
 
@@ -544,8 +556,12 @@ input[type="checkbox"] {
   border-bottom: 1px solid var(--line);
 }
 
+.player {
+  flex-wrap: wrap;
+}
+
 .player input[type="range"] {
-  flex: 1;
+  flex: 1 1 160px;
 }
 
 .player .time {
