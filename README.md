@@ -171,18 +171,23 @@ The playground runs the project's own Rust code in the browser (compiled to
 WebAssembly), so every number it shows is computed live by the library, or comes from
 the benchmark's result files.
 
-| View | What you can do |
+It reads as a short paper with live figures: the controls are the underlined words
+in its sentences (drag a number, pick a word), so the question and the knob that
+changes it are the same text.
+
+| Page | What you can do |
 |------|-----------------|
-| **Story** | Opens on the boundary attack, already playing: fixed window, sliding window and GCRA under the same burst at a window edge |
-| **Lab** | Pick an algorithm (or two, side by side), traffic and limit; play and scrub through every decision and the algorithm's state: the bucket level, the window counter, the sliding log, GCRA's theoretical arrival time |
+| **Essay** | The argument in seven sections: the boundary attack, five algorithms, a cluster, the price of exactness, overload, what went wrong, and how to use it, each with a live figure |
+| **Lab** | One algorithm, or two side by side, on any traffic and limit; play and scrub through every decision and the algorithm's state: the bucket level, the window counter, the sliding log, GCRA's theoretical arrival time |
 | **Cluster** | 2 to 8 nodes sharing one limit with any coordination strategy; change delay, clock skew and traffic skew, cut the store off, and watch admission error against a perfectly coordinated limiter |
-| **Explorer** | The benchmark's Pareto chart (store calls against admission error); select any point to replay that configuration in the cluster simulator |
+| **Explorer** | The benchmark's Pareto chart (store calls against admission error); select any point to replay that configuration in the cluster instrument |
+| **Overload** | A backend with limited capacity behind no limit, a static limit, AIMD and Gradient2; change its workers, service time, deadline and load, and watch goodput and the limit each algorithm settles on |
 | **Replay** | Drop an access log (CSV, JSON Lines or nginx/Apache combined). It is replayed through every algorithm and strategy **inside the page**, nothing is uploaded, and you get the smallest limit that keeps blocking under your target |
 | **Results** | Every result file as tables, with the machine and commit each was measured on |
 
 <p align="center">
-  <img src="docs/screenshots/playground-story.png" width="49%" alt="The story page: the headline and the live boundary attack figure" />
-  <img src="docs/screenshots/playground-cluster.png" width="49%" alt="The cluster simulator in dark mode during a store outage" />
+  <img src="docs/screenshots/playground-story.png" width="49%" alt="The essay: title, contents in the margin and the first section with its live figure" />
+  <img src="docs/screenshots/playground-cluster.png" width="49%" alt="The cluster instrument in dark mode during a store outage" />
 </p>
 
 Built for everyone: light and dark themes, full keyboard control, screen-reader
