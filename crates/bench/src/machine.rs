@@ -92,8 +92,20 @@ fn git_commit() -> Option<String> {
         return Some(commit);
     }
     let commit = run("git", &["rev-parse", "--short=12", "HEAD"])?;
-    let dirty = run("git", &["status", "--porcelain", "--untracked-files=no"])
-        .is_some_and(|s| !s.is_empty());
+    // Generated files (results and the README table) do not count as code changes.
+    let dirty = run(
+        "git",
+        &[
+            "status",
+            "--porcelain",
+            "--untracked-files=no",
+            "--",
+            ".",
+            ":!results",
+            ":!README.md",
+        ],
+    )
+    .is_some_and(|s| !s.is_empty());
     Some(if dirty {
         format!("{commit}-dirty")
     } else {

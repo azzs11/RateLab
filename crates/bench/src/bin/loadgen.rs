@@ -149,7 +149,7 @@ async fn main() -> anyhow::Result<()> {
     let results = ClusterResults {
         schema: SCHEMA,
         machine: Machine::detect(),
-        host: args.host,
+        host: args.host.filter(|h| !h.is_empty()),
         nodes: targets.len(),
         limit: config.limit(),
         window_secs: config.window().as_secs(),

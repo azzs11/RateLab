@@ -1,0 +1,8 @@
+target
+results
+.git
+.github
+.idea
+.vscode
+CLAUDE.md
+docs/screenshots
