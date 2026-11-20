@@ -9,4 +9,4 @@ repository.workspace = true
 [dependencies]
 drl-core.workspace = true
 thiserror.workspace = true
-redis = { version = "0.24", features = ["tokio-comp", "script"] }
+redis = { version = "1.8", features = ["script"] }
