@@ -6,6 +6,7 @@
 //!   throughput and fairness;
 //! - [`memory`]: bytes per key (the `memory` binary);
 //! - [`cluster`]: the 3-node Docker run against Redis (the `loadgen` binary);
+//! - [`strategies`]: the five coordination strategies in the multi-node simulator;
 //! - [`report`]: turns `results/*.json` into RESULTS.md and the README table, with the
 //!   [`machine`] each file was measured on.
 
@@ -19,3 +20,5 @@ pub mod oracle;
 pub mod report;
 pub mod results;
 pub mod stats;
+pub mod strategies;
+pub mod svg;

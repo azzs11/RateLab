@@ -6,8 +6,10 @@
 use crate::cluster::ClusterResults;
 use crate::local::{ACCURACY_KEYS, ACCURACY_LIMIT, Scenario, TENANTS};
 use crate::machine::Machine;
-use crate::results::{LocalResults, MemoryResults};
+use crate::results::{LocalResults, MemoryResults, StrategyResults};
 use crate::stats::Summary;
+use crate::strategies::{self, OUTAGE, SKEW_MS, StrategyRow};
+use crate::svg;
 use std::fmt::Write as _;
 
 /// Marks the generated part of the README.
@@ -24,6 +26,47 @@ pub struct Inputs {
     pub memory: Option<MemoryResults>,
     /// `cluster.json`.
     pub cluster: Option<ClusterResults>,
+    /// `strategies.json`.
+    pub strategies: Option<StrategyResults>,
+}
+
+/// File name of the Pareto chart for a cluster size.
+pub fn chart_name(nodes: usize) -> String {
+    format!("pareto-{nodes}-nodes.svg")
+}
+
+/// The Pareto charts to write next to RESULTS.md: one per cluster size above 1.
+pub fn charts(inputs: &Inputs) -> Vec<(String, String)> {
+    let Some(st) = &inputs.strategies else {
+        return Vec::new();
+    };
+    st.size
+        .nodes
+        .iter()
+        .filter(|&&n| n > 1)
+        .map(|&nodes| {
+            let points: Vec<svg::Point> = st
+                .matrix
+                .iter()
+                .filter(|r| r.nodes == nodes)
+                .map(|r| svg::Point {
+                    strategy: r.strategy.clone(),
+                    scenario: r.scenario.clone(),
+                    calls: r.calls_per_1k.mean,
+                    error: r.error_pct.mean,
+                })
+                .collect();
+            (
+                chart_name(nodes),
+                svg::pareto(
+                    &points,
+                    &format!(
+                        "{nodes} nodes: store calls vs admission error, every traffic pattern"
+                    ),
+                ),
+            )
+        })
+        .collect()
 }
 
 /// `mean (min–max)` with `d` decimals, or just the mean when there is no spread.
@@ -72,6 +115,9 @@ pub fn results_md(inputs: &Inputs) -> String {
     if let Some(m) = &inputs.memory {
         md.push_str(&machine_line("Memory", &m.machine));
     }
+    if let Some(st) = &inputs.strategies {
+        md.push_str(&machine_line("Strategy simulation", &st.machine));
+    }
     if let Some(c) = &inputs.cluster {
         md.push_str(&machine_line("Cluster (inside the containers)", &c.machine));
         if let Some(host) = &c.host {
@@ -82,6 +128,7 @@ pub fn results_md(inputs: &Inputs) -> String {
         ("local.json", inputs.local.is_none()),
         ("memory.json", inputs.memory.is_none()),
         ("cluster.json", inputs.cluster.is_none()),
+        ("strategies.json", inputs.strategies.is_none()),
     ]
     .iter()
     .filter(|(_, missing)| *missing)
@@ -100,6 +147,9 @@ pub fn results_md(inputs: &Inputs) -> String {
     }
     if let Some(c) = &inputs.cluster {
         cluster_section(&mut md, c);
+    }
+    if let Some(st) = &inputs.strategies {
+        strategies_section(&mut md, st);
     }
 
     md.push_str("## Reproduce\n\n```bash\njust results\n```\n\n");
@@ -368,6 +418,227 @@ fn cluster_section(md: &mut String, c: &ClusterResults) {
     }
 }
 
+/// Strategy names in report order.
+const STRATEGY_ORDER: [&str; 5] = [
+    "central_exact",
+    "local_split",
+    "async_sync",
+    "fixed_leasing",
+    "adaptive_leasing",
+];
+
+fn pivot(
+    md: &mut String,
+    rows: &[StrategyRow],
+    nodes: usize,
+    title: &str,
+    cell: fn(&StrategyRow) -> String,
+) {
+    let _ = writeln!(md, "**{title}**\n");
+    md.push_str("| Traffic |");
+    for s in STRATEGY_ORDER {
+        let _ = write!(md, " {s} |");
+    }
+    md.push_str("\n|---|");
+    for _ in STRATEGY_ORDER {
+        md.push_str("---:|");
+    }
+    md.push('\n');
+    for scenario in strategies::traffic_names() {
+        let _ = write!(md, "| {scenario} |");
+        for s in STRATEGY_ORDER {
+            let value = rows
+                .iter()
+                .find(|r| r.nodes == nodes && r.scenario == scenario && r.strategy == s)
+                .map_or_else(|| "–".to_owned(), cell);
+            let _ = write!(md, " {value} |");
+        }
+        md.push('\n');
+    }
+    md.push('\n');
+}
+
+fn strategies_section(md: &mut String, st: &StrategyResults) {
+    let _ = write!(
+        md,
+        "## Coordination strategies (simulated cluster)\n\n\
+         N nodes enforce one limit of {} per second per key together, through a shared store \
+         (what Redis runs). Traffic is the in-process scenarios at the same load ({} keys), \
+         plus **skewed**: steady Poisson with 80% of requests on node 0. Each configuration \
+         runs {} s with {} seeds in the deterministic simulator (`crates/sim`): one-way delay \
+         {} µs plus up to {} µs jitter, {} ms timeout. The network is simulated, so these \
+         numbers describe the protocols, not a machine.\n\n\
+         - **Admission error** = over + under, counted in units per key per 1 s window \
+         against the **ideal**: one perfectly coordinated token bucket on the same arrival \
+         times. Over = admitted above the ideal; under = missing below it; both as % of what \
+         the ideal admitted.\n\
+         - **Store calls** = messages from nodes to the store per 1,000 decisions.\n\
+         - **Latency** = time a request waits for its decision (0 when decided locally).\n\n\
+         Parameters: async sync every 10 ms; fixed leases of limit/4N tokens lasting one \
+         window; adaptive leases start at limit/8N, double when used up within 100 ms, halve \
+         when the store grants less than asked, and are returned after 200 ms idle.\n\n",
+        st.limit,
+        st.keys,
+        st.size.secs,
+        st.size.seeds,
+        st.network.one_way_us,
+        st.network.jitter_us,
+        st.network.timeout_ms
+    );
+    for &nodes in &st.size.nodes {
+        let _ = writeln!(
+            md,
+            "### {nodes} node{}\n",
+            if nodes == 1 { "" } else { "s" }
+        );
+        if nodes > 1 {
+            let _ = writeln!(
+                md,
+                "![Pareto chart for {nodes} nodes: store calls per 1,000 decisions against admission error]({})\n",
+                chart_name(nodes)
+            );
+        }
+        pivot(md, &st.matrix, nodes, "Admission error %", |r| {
+            spread(&r.error_pct, 2)
+        });
+        pivot(
+            md,
+            &st.matrix,
+            nodes,
+            "Store calls per 1,000 decisions",
+            |r| format!("{:.0}", r.calls_per_1k.mean),
+        );
+        pivot(md, &st.matrix, nodes, "Decision latency p99, µs", |r| {
+            format!("{:.0}", r.p99_us.mean)
+        });
+    }
+
+    let _ = write!(
+        md,
+        "### Clock skew\n\n\
+         Steady traffic on 3 nodes whose clocks are offset by {:?} ms. \
+         **central_exact_node_clock** lets each node send its own time to the store, as an \
+         application-clock script does (it stores the caller's time as is); \
+         **central_exact** uses the store's clock, like Redis `TIME`.\n\n\
+         | Strategy | Error, no skew % | Error, skewed % | Over-admission, skewed % |\n\
+         |---|---:|---:|---:|\n",
+        SKEW_MS
+    );
+    for r in &st.skew {
+        let _ = writeln!(
+            md,
+            "| {} | {} | {} | {} |",
+            r.strategy,
+            spread(&r.error_no_skew_pct, 2),
+            spread(&r.error_skewed_pct, 2),
+            spread(&r.over_skewed_pct, 2)
+        );
+    }
+
+    let _ = write!(
+        md,
+        "\n### Store outage\n\n\
+         Steady traffic on 3 nodes; the store is unreachable from {:.0}% to {:.0}% of the run. \
+         Errors here are counted only for requests that arrived during the outage.\n\n\
+         | Strategy | Policy | Allowed during % | Over during % | Under during % | Error, whole run % |\n\
+         |---|---|---:|---:|---:|---:|\n",
+        OUTAGE.0 * 100.0,
+        OUTAGE.1 * 100.0
+    );
+    for r in &st.outage {
+        let _ = writeln!(
+            md,
+            "| {} | fail {} | {:.1} | {:.1} | {:.1} | {} |",
+            r.strategy,
+            r.policy,
+            r.during_allowed_pct.mean,
+            r.during_over_pct.mean,
+            r.during_under_pct.mean,
+            spread(&r.overall_error_pct, 2)
+        );
+    }
+
+    md.push_str(
+        "\n### Traffic shift\n\n\
+         Steady traffic on 3 nodes, all of it on node 0 for the first half and all on node 1 \
+         for the second. **Rebalance** = time after the shift until three 100 ms bins in a row \
+         admit at least 90% of what the ideal admits.\n\n\
+         | Strategy | Under-admission, first second % | Rebalance ms | Runs that never rebalanced |\n\
+         |---|---:|---:|---:|\n",
+    );
+    for r in &st.convergence {
+        let rebalance = if r.rebalance_ms.n == 0 {
+            "never".to_owned()
+        } else {
+            spread(&r.rebalance_ms, 0)
+        };
+        let _ = writeln!(
+            md,
+            "| {} | {} | {} | {} |",
+            r.strategy,
+            spread(&r.under_first_second_pct, 1),
+            rebalance,
+            r.never
+        );
+    }
+
+    md.push_str("\n### Where adaptive leasing loses\n\n");
+    let beaten = strategies::dominated_by(&st.matrix, "adaptive_leasing");
+    if beaten.is_empty() {
+        md.push_str("No other strategy had both fewer store calls and less admission error in any configuration.\n\n");
+    } else {
+        md.push_str(
+            "Configurations where another strategy had fewer (or equal) store calls **and** less \
+             (or equal) admission error, one of them strictly:\n\n\
+             | Traffic | Nodes | Better strategy | Its error % | Adaptive error % | Its calls/1k | Adaptive calls/1k |\n\
+             |---|---:|---|---:|---:|---:|---:|\n",
+        );
+        for d in &beaten {
+            let _ = writeln!(
+                md,
+                "| {} | {} | {} | {:.2} | {:.2} | {:.0} | {:.0} |",
+                d.scenario, d.nodes, d.by, d.by_error, d.error, d.by_calls, d.calls
+            );
+        }
+        md.push('\n');
+    }
+    let vs_fixed: Vec<&StrategyRow> = st
+        .matrix
+        .iter()
+        .filter(|r| r.strategy == "adaptive_leasing" && r.nodes > 1)
+        .collect();
+    let fixed = |r: &StrategyRow| {
+        st.matrix.iter().find(|f| {
+            f.strategy == "fixed_leasing" && f.scenario == r.scenario && f.nodes == r.nodes
+        })
+    };
+    let fewer_calls = vs_fixed
+        .iter()
+        .filter(|r| fixed(r).is_some_and(|f| r.calls_per_1k.mean < f.calls_per_1k.mean))
+        .count();
+    let less_error = vs_fixed
+        .iter()
+        .filter(|r| fixed(r).is_some_and(|f| r.error_pct.mean < f.error_pct.mean))
+        .count();
+    let _ = writeln!(
+        md,
+        "Against fixed leasing, over the {} multi-node configurations: adaptive leasing used \
+         fewer store calls in {fewer_calls} and had less admission error in {less_error}.",
+        vs_fixed.len()
+    );
+    let conv = |name: &str| st.convergence.iter().find(|r| r.strategy == name);
+    if let (Some(a), Some(f)) = (conv("adaptive_leasing"), conv("fixed_leasing")) {
+        let _ = writeln!(
+            md,
+            "After a traffic shift it took {} ms on average to rebalance, against {} ms for fixed \
+             leasing.",
+            spread(&a.rebalance_ms, 0),
+            spread(&f.rebalance_ms, 0)
+        );
+    }
+    md.push('\n');
+}
+
 /// The short table embedded in the README.
 pub fn readme_block(inputs: &Inputs) -> String {
     let mut md = String::new();
@@ -430,6 +701,37 @@ pub fn readme_block(inputs: &Inputs) -> String {
         );
     }
     md.push('\n');
+    if let Some(st) = &inputs.strategies
+        && st.size.nodes.contains(&3)
+    {
+        let _ = write!(
+            md,
+            "**Coordination strategies**, 3 simulated nodes sharing one limit (every traffic \
+             pattern, lower left is better):\n\n![Pareto chart: store calls against admission \
+             error for 3 nodes](results/{})\n\n\
+             | Strategy | Admission error, steady % | Admission error, skewed % | Store calls / 1k, steady | p99 wait µs, steady |\n\
+             |---|---:|---:|---:|---:|\n",
+            chart_name(3)
+        );
+        for name in STRATEGY_ORDER {
+            let find = |scenario: &str| {
+                st.matrix
+                    .iter()
+                    .find(|r| r.nodes == 3 && r.strategy == name && r.scenario == scenario)
+            };
+            if let (Some(steady), Some(skewed)) = (find("steady_poisson"), find("skewed")) {
+                let _ = writeln!(
+                    md,
+                    "| {name} | {:.2} | {:.2} | {:.0} | {:.0} |",
+                    steady.error_pct.mean,
+                    skewed.error_pct.mean,
+                    steady.calls_per_1k.mean,
+                    steady.p99_us.mean
+                );
+            }
+        }
+        md.push('\n');
+    }
     if let Some(c) = &inputs.cluster
         && let Some(uniform) = c.scenarios.iter().find(|r| r.scenario == "uniform")
     {
@@ -490,7 +792,9 @@ mod tests {
     #[test]
     fn empty_inputs_say_nothing_was_measured() {
         let md = results_md(&Inputs::default());
-        assert!(md.contains("Not measured yet: local.json, memory.json, cluster.json"));
+        assert!(
+            md.contains("Not measured yet: local.json, memory.json, cluster.json, strategies.json")
+        );
         assert!(readme_block(&Inputs::default()).contains("No results yet"));
     }
 }

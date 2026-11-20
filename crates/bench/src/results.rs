@@ -4,6 +4,7 @@
 use crate::local::{AccuracyRow, FairnessRow, LatencyRow, SuiteSize, ThroughputRow, TimerInfo};
 use crate::machine::Machine;
 use crate::memory::MemoryRow;
+use crate::strategies::{ConvergenceRow, Network, OutageRow, SkewRow, StrategyRow, StrategySize};
 use anyhow::Context;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -40,6 +41,31 @@ pub struct MemoryResults {
     pub machine: Machine,
     /// One row per algorithm.
     pub rows: Vec<MemoryRow>,
+}
+
+/// `results/strategies.json`: the coordination strategies in the simulator.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StrategyResults {
+    /// File format version.
+    pub schema: u32,
+    /// Where it ran (the simulation is deterministic, so only run time depends on it).
+    pub machine: Machine,
+    /// How much work was done.
+    pub size: StrategySize,
+    /// The simulated network.
+    pub network: Network,
+    /// Per-key limit.
+    pub limit: u64,
+    /// Keys per run.
+    pub keys: u32,
+    /// Every strategy × traffic pattern × cluster size.
+    pub matrix: Vec<StrategyRow>,
+    /// Clock skew experiment.
+    pub skew: Vec<SkewRow>,
+    /// Store outage experiment.
+    pub outage: Vec<OutageRow>,
+    /// Traffic shift experiment.
+    pub convergence: Vec<ConvergenceRow>,
 }
 
 /// Writes `value` as pretty JSON, creating the parent directory.
