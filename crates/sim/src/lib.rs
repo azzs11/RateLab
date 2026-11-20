@@ -41,6 +41,7 @@ pub mod cluster;
 pub mod metrics;
 pub mod overload;
 mod scenarios;
+pub mod tokens;
 pub use scenarios::{diurnal, flash_crowd, merge, on_off, pareto, poisson};
 
 /// A small, fast, seeded PRNG (SplitMix64). Integer-only, so identical everywhere.

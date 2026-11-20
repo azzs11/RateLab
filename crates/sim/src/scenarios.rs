@@ -44,7 +44,7 @@ pub(crate) fn exponential_q32(rng: &mut SplitMix64) -> u64 {
 ///
 /// Shape 2 has a finite mean and infinite variance: most gaps are short and a few are
 /// very long. `U` is drawn from 40 bits, which caps the variate at about 2^19.
-fn pareto2_q32(rng: &mut SplitMix64) -> u64 {
+pub(crate) fn pareto2_q32(rng: &mut SplitMix64) -> u64 {
     let u = (rng.next_u64() >> 24).max(1); // U × 2^40
     // 1/√U in Q32 is √(2^40 / u) × 2^32 = √(2^104 / u).
     let inv_sqrt = ((1u128 << 104) / u128::from(u)).isqrt();
