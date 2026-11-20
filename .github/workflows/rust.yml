@@ -136,3 +136,43 @@ jobs:
     - name: Stop the cluster
       if: always()
       run: docker compose -f deploy/docker-compose.yml down --remove-orphans
+
+  web:
+    name: Playground (typecheck, unit, end-to-end, accessibility)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install Rust with the wasm32 target
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Install wasm-bindgen (same version as the crate)
+      uses: taiki-e/install-action@v2
+      with:
+        tool: wasm-bindgen-cli@0.2.130
+
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 24
+        cache: npm
+        cache-dependency-path: web/package-lock.json
+
+    - name: Build
+      working-directory: web
+      run: |
+        npm ci
+        npm run build
+
+    - name: Log parser unit tests
+      working-directory: web
+      run: node --test tests/logs.test.ts
+
+    - name: End-to-end and accessibility tests (Playwright + axe)
+      working-directory: web
+      run: |
+        npx playwright install --with-deps chromium
+        npm run test:e2e
