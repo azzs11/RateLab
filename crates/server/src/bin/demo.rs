@@ -44,10 +44,10 @@ async fn main() {
         println!("\n");
     }
 
-    println!("{}. REDIS (prototype)", Algorithm::ALL.len() + 1);
-    println!("   (Token Bucket with Redis backend)");
+    println!("{}. REDIS (shared through Redis)", Algorithm::ALL.len() + 1);
+    println!("   (Token bucket in Lua, on Redis TIME)");
     println!("   ----------------------------");
-    run_redis(config);
+    run_redis(config).await;
 
     println!("\n");
     println!("✨ Demo complete.");
@@ -89,24 +89,24 @@ async fn run_algorithm(limiter: &dyn RateLimiter) {
     }
 }
 
-fn run_redis(config: RateLimitConfig) {
-    let limiter = match RedisRateLimiter::new("redis://127.0.0.1/", config) {
+async fn run_redis(config: RateLimitConfig) {
+    let limiter = match RedisRateLimiter::connect("redis://127.0.0.1/", config).await {
         Ok(l) => l,
         Err(e) => {
-            println!("   ⚠️  Invalid Redis URL: {e}");
+            println!("   ⚠️  Redis not available ({e})");
+            println!("   💡 Start one with: docker run --rm -p 6379:6379 redis:7.4-alpine");
             return;
         }
     };
-    if limiter.reset("user_redis").is_err() {
-        println!("   ⚠️  Redis not available (start a Redis server to try this mode)");
-        println!("   💡 Run: redis-server");
+    if limiter.reset("user_redis").await.is_err() {
+        println!("   ⚠️  Redis did not answer");
         return;
     }
     println!("   ✅ Connected to Redis\n");
 
     for i in 1..=5 {
         let start = Instant::now();
-        match limiter.check("user_redis", Cost::ONE) {
+        match limiter.check("user_redis", Cost::ONE).await {
             Ok(decision) => {
                 record_request(decision.allowed, start);
                 show(i, decision.allowed);
@@ -117,5 +117,5 @@ fn run_redis(config: RateLimitConfig) {
             }
         }
     }
-    let _ = limiter.reset("user_redis");
+    let _ = limiter.reset("user_redis").await;
 }
