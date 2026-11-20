@@ -47,6 +47,8 @@ pub enum Source {
     RedisError,
     /// An in-process limiter (not expected in the cluster run).
     Local,
+    /// A coordination strategy (the real-cluster strategy runs).
+    Strategy,
     /// No response (connection error or timeout at the load generator).
     NoResponse,
 }
@@ -59,6 +61,7 @@ impl Source {
             Some("breaker_open") => Source::BreakerOpen,
             Some("redis_error") => Source::RedisError,
             Some("local") => Source::Local,
+            Some("strategy") => Source::Strategy,
             _ => Source::NoResponse,
         }
     }

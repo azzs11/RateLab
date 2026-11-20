@@ -54,6 +54,10 @@ struct Args {
     /// The nodes' Redis timeout in ms (recorded, not applied).
     #[arg(long, env = "DRL_REDIS_TIMEOUT_MS")]
     redis_timeout_ms: Option<u64>,
+    /// `cluster` (the Redis token bucket: accuracy, throughput, outage) or `strategies`
+    /// (every coordination strategy on the real cluster, against the simulator).
+    #[arg(long, env = "DRL_MODE", default_value = "cluster")]
+    mode: String,
 }
 
 struct Size {
@@ -118,6 +122,10 @@ async fn main() -> anyhow::Result<()> {
         .get_multiplexed_async_connection()
         .await
         .context("connect to Redis")?;
+
+    if args.mode == "strategies" {
+        return strategies_mode(&args, &client, &targets, &mut redis, size, config).await;
+    }
 
     let mut scenarios = Vec::new();
     for (name, node0_pct) in [("uniform", None), ("skewed", Some(SKEWED_NODE0_PCT))] {
@@ -531,4 +539,73 @@ async fn outage(
         cluster::resilience(config, &samples, start_s * 1_000_000_000, end_ns),
         cluster::recovery_ms(&samples, targets.len(), end_ns),
     ))
+}
+
+/// Every coordination strategy on the real cluster: the nodes switch strategy through
+/// their benchmark-only admin route, Redis is emptied, and the same traffic is sent.
+async fn strategies_mode(
+    args: &Args,
+    client: &reqwest::Client,
+    targets: &Arc<Vec<String>>,
+    redis: &mut redis::aio::MultiplexedConnection,
+    size: &Size,
+    config: RateLimitConfig,
+) -> anyhow::Result<()> {
+    use bench::real_strategies::{self, RealStrategyResults};
+    use drl_core::strategies::Strategy;
+    let seeds = if args.quick { 1 } else { 3 };
+    let nodes = targets.len();
+    let mut rows = Vec::new();
+    for strategy in Strategy::defaults(config, nodes as u64) {
+        let name = strategy.name();
+        for t in targets.iter() {
+            client
+                .post(format!("{t}/admin/strategy/{name}"))
+                .send()
+                .await?
+                .error_for_status()
+                .with_context(|| {
+                    format!("switch {t} to {name} (is DRL_ADMIN=1 set on the nodes?)")
+                })?;
+        }
+        let _: () = redis::cmd("FLUSHALL").query_async(redis).await?;
+        for (scenario, node0_pct) in [("uniform", None), ("skewed", Some(SKEWED_NODE0_PCT))] {
+            let mut runs = Vec::new();
+            for seed in 1..=seeds {
+                eprintln!("{name} {scenario} seed {seed}");
+                let plan = plan(seed, size, config, nodes, node0_pct, false);
+                let before = redis_counters(redis).await?;
+                let samples = send(
+                    client,
+                    targets,
+                    &plan,
+                    &format!("{name}-{scenario}-{seed}-"),
+                )
+                .await;
+                let after = redis_counters(redis).await?;
+                let calls = after.calls.saturating_sub(before.calls);
+                runs.push(real_strategies::compare(
+                    strategy, config, nodes, &samples, calls,
+                ));
+            }
+            let node0 = node0_pct.map_or(100.0 / nodes as f64, |p| p as f64);
+            rows.push(real_strategies::row(name, scenario, node0, &runs));
+        }
+    }
+    let results = RealStrategyResults {
+        schema: SCHEMA,
+        machine: Machine::detect(),
+        host: args.host.clone().filter(|h| !h.is_empty()),
+        nodes,
+        limit: config.limit(),
+        window_secs: config.window().as_secs(),
+        keys: size.keys,
+        load_factor: size.load_factor,
+        run_secs: size.run_secs,
+        seeds,
+        rows,
+    };
+    write_json(&args.out, &results)?;
+    eprintln!("wrote {}", args.out.display());
+    Ok(())
 }

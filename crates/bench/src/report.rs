@@ -6,6 +6,8 @@
 use crate::cluster::ClusterResults;
 use crate::local::{ACCURACY_KEYS, ACCURACY_LIMIT, Scenario, TENANTS};
 use crate::machine::Machine;
+use crate::real_strategies::RealStrategyResults;
+use crate::real_traffic::TraceResults;
 use crate::results::{LocalResults, MemoryResults, StrategyResults};
 use crate::stats::Summary;
 use crate::strategies::{self, OUTAGE, SKEW_MS, StrategyRow};
@@ -28,6 +30,30 @@ pub struct Inputs {
     pub cluster: Option<ClusterResults>,
     /// `strategies.json`.
     pub strategies: Option<StrategyResults>,
+    /// `traces.json`.
+    pub traces: Option<TraceResults>,
+    /// `real_strategies.json`.
+    pub real_strategies: Option<RealStrategyResults>,
+}
+
+/// The largest gaps between the real cluster and the simulator: admission error in
+/// percentage points, store calls as a % of the real value.
+pub fn sim_gap(r: &RealStrategyResults) -> (f64, f64) {
+    let error = r
+        .rows
+        .iter()
+        .map(|x| (x.real_error_pct.mean - x.sim_error_pct.mean).abs())
+        .fold(0.0, f64::max);
+    let calls = r
+        .rows
+        .iter()
+        .filter(|x| x.real_calls_per_1k.mean > 0.0)
+        .map(|x| {
+            (x.real_calls_per_1k.mean - x.sim_calls_per_1k.mean).abs() * 100.0
+                / x.real_calls_per_1k.mean
+        })
+        .fold(0.0, f64::max);
+    (error, calls)
 }
 
 /// File name of the Pareto chart for a cluster size.
@@ -118,6 +144,15 @@ pub fn results_md(inputs: &Inputs) -> String {
     if let Some(st) = &inputs.strategies {
         md.push_str(&machine_line("Strategy simulation", &st.machine));
     }
+    if let Some(t) = &inputs.traces {
+        md.push_str(&machine_line("Real traffic replay", &t.machine));
+    }
+    if let Some(r) = &inputs.real_strategies {
+        md.push_str(&machine_line(
+            "Strategies on the real cluster (inside the containers)",
+            &r.machine,
+        ));
+    }
     if let Some(c) = &inputs.cluster {
         md.push_str(&machine_line("Cluster (inside the containers)", &c.machine));
         if let Some(host) = &c.host {
@@ -129,6 +164,8 @@ pub fn results_md(inputs: &Inputs) -> String {
         ("memory.json", inputs.memory.is_none()),
         ("cluster.json", inputs.cluster.is_none()),
         ("strategies.json", inputs.strategies.is_none()),
+        ("traces.json", inputs.traces.is_none()),
+        ("real_strategies.json", inputs.real_strategies.is_none()),
     ]
     .iter()
     .filter(|(_, missing)| *missing)
@@ -150,6 +187,12 @@ pub fn results_md(inputs: &Inputs) -> String {
     }
     if let Some(st) = &inputs.strategies {
         strategies_section(&mut md, st);
+    }
+    if let Some(r) = &inputs.real_strategies {
+        real_strategies_section(&mut md, r);
+    }
+    if let Some(t) = &inputs.traces {
+        traces_section(&mut md, t);
     }
 
     md.push_str("## Reproduce\n\n```bash\njust results\n```\n\n");
@@ -416,6 +459,106 @@ fn cluster_section(md: &mut String, c: &ClusterResults) {
         }
         md.push('\n');
     }
+}
+
+fn real_strategies_section(md: &mut String, r: &RealStrategyResults) {
+    let (err_gap, calls_gap) = sim_gap(r);
+    let _ = write!(
+        md,
+        "## Strategies on the real cluster, against the simulator\n\n\
+         The {} Axum nodes run each coordination strategy for real, with Redis as the shared \
+         store (the same Lua protocol the simulator models). The load generator sends {} keys \
+         at {:.1}× the limit of {} per {} s, {} s per run, {} seeds, and records every request. \
+         The **same recorded requests** (same send times, same nodes) are then replayed through \
+         the simulator. Both sides are measured with the same code against one perfectly \
+         coordinated token bucket.{}\n\n\
+         Largest gap between real and simulated: **{:.2} percentage points** of admission error \
+         and **{:.1}%** in store calls.\n\n\
+         | Strategy | Traffic | Error real % | Error sim % | Calls/1k real | Calls/1k sim | p99 real µs | p99 sim µs |\n\
+         |---|---|---:|---:|---:|---:|---:|---:|\n",
+        r.nodes,
+        r.keys,
+        r.load_factor,
+        r.limit,
+        r.window_secs,
+        r.run_secs,
+        r.seeds,
+        r.host
+            .as_ref()
+            .map_or_else(String::new, |h| format!(" Host: {h}.")),
+        err_gap,
+        calls_gap
+    );
+    for x in &r.rows {
+        let _ = writeln!(
+            md,
+            "| {} | {} | {} | {} | {} | {} | {} | {} |",
+            x.strategy,
+            x.scenario,
+            spread(&x.real_error_pct, 2),
+            spread(&x.sim_error_pct, 2),
+            spread(&x.real_calls_per_1k, 0),
+            spread(&x.sim_calls_per_1k, 0),
+            spread(&x.real_p99_us, 0),
+            spread(&x.sim_p99_us, 0)
+        );
+    }
+    md.push_str(
+        "\nReal latency is measured at the load generator and includes the HTTP request to the \
+         node and Docker networking; the simulator's is the decision wait alone (0 when a node \
+         decides locally).\n\n",
+    );
+}
+
+fn traces_section(md: &mut String, t: &TraceResults) {
+    let _ = write!(
+        md,
+        "## Real traffic: {}\n\n\
+         {} requests from {} clients over {} days ([source and terms]({})), downloaded into \
+         memory when the benchmark runs, checked against a pinned SHA-256, replayed, and \
+         discarded; nothing is stored, and client identities never leave the process. \
+         Timestamps have {} s resolution. The per-client limit is **{} per {} s**: the smallest \
+         at which the exact rule (sliding window log) blocks at most {}% of requests, found \
+         by binary search, not chosen by hand.\n\n\
+         | Algorithm | Blocked % | Over vs exact % | Under vs exact % | Worst window × limit |\n\
+         |---|---:|---:|---:|---:|\n",
+        t.trace.name,
+        t.trace.requests,
+        t.trace.clients,
+        t.trace.span_secs / 86_400,
+        t.trace.homepage,
+        t.trace.resolution_secs,
+        t.limit,
+        t.window_secs,
+        t.target_blocked_pct
+    );
+    for r in &t.algorithms {
+        let _ = writeln!(
+            md,
+            "| {} | {:.2} | {:.3} | {:.3} | {:.2} |",
+            r.algorithm, r.blocked_pct, r.over_pct, r.under_pct, r.worst_window_ratio
+        );
+    }
+    md.push_str(
+        "\nThe coordination strategies on the same log, each request sent to a node at random \
+         (as a load balancer would), in the simulator:\n\n\
+         | Strategy | Nodes | Admission error % | Over % | Under % | Store calls / 1k | p99 wait µs |\n\
+         |---|---:|---:|---:|---:|---:|---:|\n",
+    );
+    for r in &t.strategies {
+        let _ = writeln!(
+            md,
+            "| {} | {} | {:.2} | {:.2} | {:.2} | {:.0} | {:.0} |",
+            r.strategy, r.nodes, r.error_pct, r.over_pct, r.under_pct, r.calls_per_1k, r.p99_us
+        );
+    }
+    let files: Vec<String> = t
+        .trace
+        .files
+        .iter()
+        .map(|(url, sha)| format!("`{url}` (SHA-256 `{sha}`)"))
+        .collect();
+    let _ = write!(md, "\nFiles: {}.\n\n", files.join(", "));
 }
 
 /// Strategy names in report order.
@@ -732,6 +875,43 @@ pub fn readme_block(inputs: &Inputs) -> String {
         }
         md.push('\n');
     }
+    if let Some(t) = &inputs.traces {
+        let find = |name: &str, nodes: usize| {
+            t.strategies
+                .iter()
+                .find(|r| r.strategy == name && r.nodes == nodes)
+        };
+        if let (Some(central), Some(adaptive)) =
+            (find("central_exact", 3), find("adaptive_leasing", 3))
+        {
+            let _ = writeln!(
+                md,
+                "**Real traffic** ({} requests from {} clients, {}): at the limit that blocks {}% \
+                 under the exact rule ({} per {} s), adaptive leasing on 3 nodes needed {:.0} store \
+                 calls per 1,000 decisions against {:.0} for central exact, with {:.2}% admission \
+                 error.\n",
+                t.trace.requests,
+                t.trace.clients,
+                t.trace.name,
+                t.target_blocked_pct,
+                t.limit,
+                t.window_secs,
+                adaptive.calls_per_1k,
+                central.calls_per_1k,
+                adaptive.error_pct
+            );
+        }
+    }
+    if let Some(r) = &inputs.real_strategies {
+        let (err_gap, calls_gap) = sim_gap(r);
+        let _ = writeln!(
+            md,
+            "**Simulator checked against the real cluster:** all five strategies on {} real nodes \
+             and Redis, against the simulator fed the same recorded requests. Largest gap: {:.2} \
+             percentage points of admission error, {:.1}% in store calls.\n",
+            r.nodes, err_gap, calls_gap
+        );
+    }
     if let Some(c) = &inputs.cluster
         && let Some(uniform) = c.scenarios.iter().find(|r| r.scenario == "uniform")
     {
@@ -792,9 +972,7 @@ mod tests {
     #[test]
     fn empty_inputs_say_nothing_was_measured() {
         let md = results_md(&Inputs::default());
-        assert!(
-            md.contains("Not measured yet: local.json, memory.json, cluster.json, strategies.json")
-        );
+        assert!(md.contains("Not measured yet: local.json, memory.json, cluster.json, strategies.json, traces.json, real_strategies.json"));
         assert!(readme_block(&Inputs::default()).contains("No results yet"));
     }
 }
