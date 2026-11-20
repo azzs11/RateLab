@@ -1,0 +1,21 @@
+[package]
+name = "axum-api-example"
+description = "A small Axum API rate limited and overload-protected with the ratelab crate."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+ratelab = { workspace = true, features = ["std-clock"] }
+axum = "0.8"
+serde_json = "1.0"
+tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+
+[lints]
+workspace = true
