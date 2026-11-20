@@ -192,6 +192,42 @@ impl Strategy {
         }
     }
 
+    /// The five strategies with default parameters for a `nodes`-node cluster:
+    ///
+    /// - async sync every `window / 100`;
+    /// - fixed leases of `limit / 4N` tokens (at least 1) lasting one window;
+    /// - adaptive leasing with [`AdaptiveParams::for_cluster`].
+    ///
+    /// ```
+    /// use drl_core::strategies::Strategy;
+    /// use drl_core::RateLimitConfig;
+    ///
+    /// let names: Vec<_> = Strategy::defaults(RateLimitConfig::per_second(100)?, 3)
+    ///     .iter()
+    ///     .map(Strategy::name)
+    ///     .collect();
+    /// assert_eq!(
+    ///     names,
+    ///     ["central_exact", "local_split", "async_sync", "fixed_leasing", "adaptive_leasing"]
+    /// );
+    /// # Ok::<(), drl_core::ConfigError>(())
+    /// ```
+    pub fn defaults(config: RateLimitConfig, nodes: u64) -> [Strategy; 5] {
+        let nodes = nodes.max(1);
+        [
+            Strategy::CentralExact { node_clock: false },
+            Strategy::LocalSplit,
+            Strategy::AsyncSync {
+                interval: config.window() / 100,
+            },
+            Strategy::FixedLeasing {
+                chunk: (config.limit() / (4 * nodes)).max(1),
+                ttl: config.window(),
+            },
+            Strategy::AdaptiveLeasing(AdaptiveParams::for_cluster(config, nodes)),
+        ]
+    }
+
     /// One node's instance, for a cluster of `nodes` nodes enforcing `config`.
     ///
     /// ```
