@@ -6,6 +6,7 @@
 //! - [`cluster::ClusterView`]: the multi-node simulator with any strategy;
 //! - [`overload::OverloadRun`]: concurrency limits in front of a backend with limited
 //!   capacity;
+//! - [`tokens::TokenDemo`] and [`tokens::TokenView`]: token limits for LLM traffic;
 //! - [`replay::ReplayReport`]: a log replayed through everything, plus a limit
 //!   recommendation.
 //!
@@ -30,6 +31,7 @@ pub mod cluster;
 pub mod lab;
 pub mod overload;
 pub mod replay;
+pub mod tokens;
 pub mod traffic;
 
 use drl_core::{Algorithm, Cost, ManualClock, Nanos, RateLimitConfig, RateLimiter};
