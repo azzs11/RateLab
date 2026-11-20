@@ -5,6 +5,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 dashmap = "6.2"
@@ -14,3 +15,6 @@ thiserror.workspace = true
 default = ["std-clock"]
 # Real monotonic clock (reads std::time::Instant). Disable for wasm32-unknown-unknown.
 std-clock = []
+
+[lints]
+workspace = true
