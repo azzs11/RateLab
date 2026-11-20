@@ -287,6 +287,12 @@
   stroke-width: 2;
 }
 
+.pareto .point[data-selected="true"] .hit {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
 .pareto .point[data-dim="true"] {
   opacity: 0.22;
 }
@@ -467,4 +473,88 @@ tbody th {
 
 .spacer {
   height: var(--s-8);
+}
+
+/* ---------- Explorer ---------- */
+
+.explorer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-4);
+}
+
+.explorer-controls .field {
+  min-width: 220px;
+}
+
+.explorer-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--s-6);
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .explorer-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.explorer-detail {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.explorer-title {
+  font-size: var(--step-2);
+}
+
+.explorer-dl {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+}
+
+.explorer-dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-3);
+  border-bottom: 1px dashed var(--line);
+  padding-bottom: var(--s-1);
+}
+
+.explorer-dl dt {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.explorer-dl dd {
+  margin: 0;
+}
+
+.explorer-tables {
+  padding-block: var(--s-6) var(--s-8);
+}
+
+.explorer-sub {
+  font-size: var(--step-2);
+  margin-top: var(--s-6);
+}
+
+.table-title {
+  caption-side: top;
+  text-align: left;
+  padding: var(--s-3) var(--s-4);
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+}
+
+td.lead {
+  font-weight: 700;
+  color: var(--accent);
 }

@@ -31,7 +31,7 @@ function shape(kind: string, x: number, y: number, r: number, colour: string): s
 /** Renders the chart. `onPick` is called when a point is activated. */
 export function paretoChart(
   points: ParetoPoint[],
-  opts: { title: string; onPick?: (p: ParetoPoint) => void; highlight?: string },
+  opts: { title: string; onPick?: (p: ParetoPoint) => void; highlight?: string; selected?: string },
 ): SVGSVGElement {
   const W = 720;
   const H = 420;
@@ -79,6 +79,10 @@ export function paretoChart(
     const label = `${pretty(p.strategy)}, ${p.scenario.replace(/_/g, " ")}: ${Math.round(p.calls)} calls per 1,000 decisions, ${fmtPct(p.error)} admission error`;
     g.setAttribute("aria-label", label);
     if (opts.highlight && opts.highlight !== p.scenario) g.setAttribute("data-dim", "true");
+    if (opts.selected === `${p.strategy}:${p.scenario}`) {
+      g.setAttribute("data-selected", "true");
+      g.setAttribute("aria-pressed", "true");
+    }
     g.innerHTML = `<title>${label}</title><circle cx="${px(p.calls)}" cy="${py(p.error)}" r="13" class="hit"/>${shape(style.shape, px(p.calls), py(p.error), 6.5, style.colour)}`;
     if (opts.onPick) {
       const pick = () => opts.onPick?.(p);
