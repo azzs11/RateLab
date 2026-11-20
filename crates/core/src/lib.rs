@@ -1,4 +1,13 @@
 pub mod algorithms;
+pub mod clock;
+pub mod decision;
+pub mod units;
+
+#[cfg(feature = "std-clock")]
+pub use clock::MonotonicClock;
+pub use clock::{Clock, ManualClock};
+pub use decision::Decision;
+pub use units::{Cost, Nanos, Tokens};
 
 use std::time::Duration;
 use thiserror::Error;

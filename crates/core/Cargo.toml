@@ -8,3 +8,8 @@ repository.workspace = true
 
 [dependencies]
 thiserror.workspace = true
+
+[features]
+default = ["std-clock"]
+# Real monotonic clock (reads std::time::Instant). Disable for wasm32-unknown-unknown.
+std-clock = []
