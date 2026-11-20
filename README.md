@@ -324,6 +324,8 @@ Measured on Apple M5, 10 logical CPUs, 16 GiB RAM, macOS 27.0 (aarch64), rustc 1
 
 **Simulator checked against the real cluster:** all five strategies on 3 real nodes and Redis, against the simulator fed the same recorded requests. Largest gap: 0.12 percentage points of admission error, 1.0% in store calls.
 
+**Overload** (real, the server's own concurrency layer): with no limit, a ramp to 3× a backend's capacity kept 27.9% of the possible goodput; Gradient2 kept 95.9%. When the backend lost half its workers and then doubled them, a static limit tuned to the healthy backend kept 75.3% (p99 66 ms) and Gradient2 kept 96.2% (p99 97 ms).
+
 **3 nodes sharing Redis** (Docker Compose on the same machine): over-admission 1.93% compared with one perfectly coordinated token bucket, 1000 Redis calls per 1,000 decisions, p99 1.37 ms at the client, 122125 requests/s closed-loop.
 
 <!-- results:end -->

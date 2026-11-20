@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 480" font-family="Inter, system-ui, sans-serif" font-size="13" role="img" aria-label="ramp: successful answers per second (real, seed 1)">
+<rect width="760" height="480" fill="#ffffff"/>
+<text x="70" y="28" font-size="15" font-weight="600" fill="#1a1a1a">ramp: successful answers per second (real, seed 1)</text>
+<line x1="70" x2="560.0" y1="420.0" y2="420.0" stroke="#e5e5e5"/><text x="62.0" y="424.0" text-anchor="end" fill="#555">0</text>
+<line x1="70" x2="560.0" y1="327.5" y2="327.5" stroke="#e5e5e5"/><text x="62.0" y="331.5" text-anchor="end" fill="#555">625</text>
+<line x1="70" x2="560.0" y1="235.0" y2="235.0" stroke="#e5e5e5"/><text x="62.0" y="239.0" text-anchor="end" fill="#555">1250</text>
+<line x1="70" x2="560.0" y1="142.5" y2="142.5" stroke="#e5e5e5"/><text x="62.0" y="146.5" text-anchor="end" fill="#555">1875</text>
+<line x1="70" x2="560.0" y1="50.0" y2="50.0" stroke="#e5e5e5"/><text x="62.0" y="54.0" text-anchor="end" fill="#555">2500</text>
+<text x="70.0" y="438.0" text-anchor="middle" fill="#555">0</text>
+<text x="155.2" y="438.0" text-anchor="middle" fill="#555">2</text>
+<text x="240.4" y="438.0" text-anchor="middle" fill="#555">4</text>
+<text x="325.7" y="438.0" text-anchor="middle" fill="#555">6</text>
+<text x="410.9" y="438.0" text-anchor="middle" fill="#555">8</text>
+<text x="496.1" y="438.0" text-anchor="middle" fill="#555">10</text>
+<rect x="70" y="50" width="490" height="370" fill="none" stroke="#999"/>
+<text x="315.0" y="462.0" text-anchor="middle" fill="#1a1a1a">Seconds</text>
+<text transform="translate(18 235.0) rotate(-90)" text-anchor="middle" fill="#1a1a1a">Requests per second</text>
+<g><title>offered</title><polyline points="70.0,382.4 91.3,377.1 112.6,357.2 133.9,345.4 155.2,337.4 176.5,313.4 197.8,309.3 219.1,287.7 240.4,269.3 261.7,265.5 283.0,256.9 304.3,237.1 325.7,216.6 347.0,222.9 368.3,207.5 389.6,193.3 410.9,177.0 432.2,152.1 453.5,146.2 474.8,109.2 496.1,112.2 517.4,89.1 538.7,97.4 560.0,81.1" fill="none" stroke="#999999" stroke-width="1.5" stroke-dasharray="2 3" stroke-linejoin="round"/></g>
+<g><title>best possible</title><polyline points="70.0,382.4 91.3,377.1 112.6,357.2 133.9,345.4 155.2,337.4 176.5,313.4 197.8,309.3 219.1,301.6 240.4,301.6 261.7,301.6 283.0,301.6 304.3,301.6 325.7,301.6 347.0,301.6 368.3,301.6 389.6,301.6 410.9,301.6 432.2,301.6 453.5,301.6 474.8,301.6 496.1,301.6 517.4,301.6 538.7,301.6 560.0,301.6" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-dasharray="1 2" stroke-linejoin="round"/></g>
+<g><title>none (200s)</title><polyline points="70.0,382.4 91.3,377.1 112.6,357.2 133.9,345.4 155.2,337.4 176.5,313.4 197.8,309.3 219.1,287.7 240.4,359.0 261.7,420.0 283.0,420.0 304.3,420.0 325.7,420.0 347.0,420.0 368.3,420.0 389.6,420.0 410.9,420.0 432.2,420.0 453.5,420.0 474.8,420.0 496.1,420.0 517.4,420.0 538.7,420.0 560.0,420.0" fill="none" stroke="#E69F00" stroke-width="2" stroke-dasharray="9 3 2 3" stroke-linejoin="round"/></g>
+<g><title>static (200s)</title><polyline points="70.0,382.4 91.3,377.1 112.6,357.2 133.9,346.0 155.2,339.5 176.5,328.5 197.8,327.6 219.1,320.5 240.4,314.6 261.7,320.5 283.0,311.7 304.3,309.3 325.7,311.1 347.0,311.1 368.3,310.2 389.6,314.6 410.9,308.7 432.2,309.6 453.5,308.4 474.8,309.3 496.1,311.7 517.4,308.1 538.7,309.3 560.0,305.4" fill="none" stroke="#0072B2" stroke-width="2" stroke-linejoin="round"/></g>
+<g><title>aimd (200s)</title><polyline points="70.0,382.4 91.3,377.1 112.6,357.2 133.9,345.4 155.2,337.4 176.5,313.4 197.8,309.3 219.1,287.7 240.4,358.4 261.7,314.6 283.0,367.6 304.3,312.0 325.7,410.2 347.0,302.2 368.3,412.3 389.6,334.5 410.9,331.2 432.2,408.8 453.5,320.5 474.8,404.6 496.1,333.9 517.4,332.4 538.7,407.9 560.0,315.8" fill="none" stroke="#CC79A7" stroke-width="2" stroke-dasharray="5 3" stroke-linejoin="round"/></g>
+<g><title>gradient2 (200s)</title><polyline points="70.0,382.4 91.3,377.1 112.6,357.2 133.9,345.4 155.2,337.4 176.5,315.2 197.8,310.8 219.1,309.0 240.4,304.6 261.7,309.0 283.0,302.8 304.3,305.7 325.7,308.7 347.0,304.6 368.3,306.0 389.6,310.8 410.9,302.8 432.2,313.1 453.5,308.1 474.8,306.3 496.1,311.1 517.4,304.6 538.7,309.6 560.0,301.9" fill="none" stroke="#009E73" stroke-width="3" stroke-linejoin="round"/></g>
+<line x1="580.0" x2="608.0" y1="60.0" y2="60.0" stroke="#999999" stroke-width="1.5" stroke-dasharray="2 3"/><text x="616.0" y="64.0" fill="#1a1a1a">offered</text>
+<line x1="580.0" x2="608.0" y1="84.0" y2="84.0" stroke="#1a1a1a" stroke-width="2" stroke-dasharray="1 2"/><text x="616.0" y="88.0" fill="#1a1a1a">best possible</text>
+<line x1="580.0" x2="608.0" y1="108.0" y2="108.0" stroke="#E69F00" stroke-width="2" stroke-dasharray="9 3 2 3"/><text x="616.0" y="112.0" fill="#1a1a1a">none (200s)</text>
+<line x1="580.0" x2="608.0" y1="132.0" y2="132.0" stroke="#0072B2" stroke-width="2"/><text x="616.0" y="136.0" fill="#1a1a1a">static (200s)</text>
+<line x1="580.0" x2="608.0" y1="156.0" y2="156.0" stroke="#CC79A7" stroke-width="2" stroke-dasharray="5 3"/><text x="616.0" y="160.0" fill="#1a1a1a">aimd (200s)</text>
+<line x1="580.0" x2="608.0" y1="180.0" y2="180.0" stroke="#009E73" stroke-width="3"/><text x="616.0" y="184.0" fill="#1a1a1a">gradient2 (200s)</text>
+</svg>
