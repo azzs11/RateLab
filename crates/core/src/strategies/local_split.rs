@@ -59,4 +59,8 @@ impl CoordinationStrategy for LocalSplit {
     fn on_reply(&mut self, _: Nanos, _: MessageId, _: StoreReply, _: &mut Outbox) {}
 
     fn on_failure(&mut self, _: Nanos, _: MessageId, _: &mut Outbox) {}
+
+    fn local_tokens(&self, now: Nanos) -> u64 {
+        self.buckets.values().map(|b| b.tokens_at(now)).sum()
+    }
 }

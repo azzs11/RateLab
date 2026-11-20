@@ -66,6 +66,8 @@ pub struct ClusterConfig {
     pub seed: u64,
     /// Keep a log of every message to the store (for visualisation).
     pub record_messages: bool,
+    /// Sample every node's locally held tokens this often (for visualisation).
+    pub sample_every: Option<Duration>,
 }
 
 impl ClusterConfig {
@@ -80,6 +82,7 @@ impl ClusterConfig {
             outage: None,
             seed: 0,
             record_messages: false,
+            sample_every: None,
         }
     }
 }
@@ -126,6 +129,15 @@ pub struct MessageRecord {
     pub handled: Option<(Nanos, StoreReply)>,
 }
 
+/// Every node's locally held tokens at one moment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NodeSample {
+    /// Simulation time.
+    pub at: Nanos,
+    /// [`CoordinationStrategy::local_tokens`] of each node.
+    pub tokens: Vec<u64>,
+}
+
 /// Everything one run produced.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClusterRun {
@@ -141,6 +153,8 @@ pub struct ClusterRun {
     pub timeouts: u64,
     /// Every message, if recorded.
     pub messages: Vec<MessageRecord>,
+    /// Held tokens over time, if sampled.
+    pub samples: Vec<NodeSample>,
 }
 
 #[derive(Debug)]
@@ -164,6 +178,7 @@ enum Event {
     Tick {
         node: usize,
     },
+    Sample,
 }
 
 #[derive(Debug)]
@@ -207,6 +222,7 @@ struct Sim<'a> {
     timeouts: u64,
     out: Outbox,
     log: Vec<MessageRecord>,
+    samples: Vec<NodeSample>,
 }
 
 impl Sim<'_> {
@@ -331,6 +347,21 @@ impl Sim<'_> {
                 self.nodes[node].on_failure(t, id, &mut self.out);
                 self.flush(node, now);
             }
+            Event::Sample => {
+                let tokens = (0..self.nodes.len())
+                    .map(|n| self.nodes[n].local_tokens(self.node_time(n, now)))
+                    .collect();
+                self.samples.push(NodeSample {
+                    at: Nanos(now),
+                    tokens,
+                });
+                if let Some(every) = self.cfg.sample_every {
+                    let next = now + Nanos::from_duration(every).0.max(1);
+                    if next <= tick_until {
+                        self.push(next, Event::Sample);
+                    }
+                }
+            }
             Event::Tick { node } => {
                 let t = self.node_time(node, now);
                 self.nodes[node].on_tick(t, &mut self.out);
@@ -373,12 +404,16 @@ pub fn run_cluster(
         timeouts: 0,
         out: Outbox::default(),
         log: Vec::new(),
+        samples: Vec::new(),
     };
     for (i, a) in arrivals.iter().enumerate() {
         sim.push(a.arrival.at.0, Event::Arrive(i));
     }
     let last = arrivals.last().map_or(0, |a| a.arrival.at.0);
     let tick_until = last.saturating_add(config.window_nanos());
+    if cluster.sample_every.is_some() {
+        sim.push(0, Event::Sample);
+    }
     for node in 0..n {
         if let Some(every) = sim.nodes[node].tick_every() {
             sim.push(Nanos::from_duration(every).0.max(1), Event::Tick { node });
@@ -395,6 +430,7 @@ pub fn run_cluster(
         store_ops: sim.store.ops(),
         timeouts: sim.timeouts,
         messages: sim.log,
+        samples: sim.samples,
     }
 }
 

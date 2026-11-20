@@ -140,3 +140,15 @@ fn the_message_log_records_requests_and_replies() {
     let quiet = run(CENTRAL, 1_000, &ClusterConfig::new(1), &every(10, MS, 1));
     assert!(quiet.messages.is_empty());
 }
+
+#[test]
+fn samples_show_what_each_node_holds() {
+    let mut c = ClusterConfig::new(2);
+    c.sample_every = Some(Duration::from_millis(100));
+    let r = run(Strategy::LocalSplit, 10, &c, &every(4, MS, 2));
+    // The first sample comes right after the request at t = 0: node 0 has spent one of
+    // its 5 tokens, node 1 has no bucket yet. Later each node refills its full share.
+    assert_eq!(r.samples[0].tokens, [4, 0]);
+    assert!(r.samples.len() > 5);
+    assert_eq!(r.samples.last().unwrap().tokens, [5, 5]); // a full 10 / 2 share each
+}

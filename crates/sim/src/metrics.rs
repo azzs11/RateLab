@@ -206,6 +206,7 @@ mod tests {
             store_ops: 0,
             timeouts: 0,
             messages: Vec::new(),
+            samples: Vec::new(),
         };
         let ideal = [true, true, false, false];
         // Same count, different requests: no admission error.

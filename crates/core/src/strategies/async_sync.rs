@@ -123,6 +123,10 @@ impl CoordinationStrategy for AsyncSync {
         Some(self.interval)
     }
 
+    fn local_tokens(&self, now: Nanos) -> u64 {
+        self.keys.values().map(|k| k.estimate.tokens_at(now)).sum()
+    }
+
     fn on_tick(&mut self, _now: Nanos, out: &mut Outbox) {
         for (key, state) in &mut self.keys {
             if state.unsynced == 0 || state.in_flight {

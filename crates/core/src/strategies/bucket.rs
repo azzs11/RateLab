@@ -105,6 +105,13 @@ impl ShareBucket {
         self.last = now.0;
     }
 
+    /// Whole tokens that would be available at `now`, without changing the bucket.
+    pub fn tokens_at(&self, now: Nanos) -> u64 {
+        let added = u128::from(now.0.saturating_sub(self.last)).saturating_mul(self.rate);
+        let level = self.level.saturating_add(added).min(self.capacity);
+        u64::try_from(level / self.unit).unwrap_or(u64::MAX)
+    }
+
     /// Whole tokens available.
     pub fn tokens(&self) -> u64 {
         u64::try_from(self.level / self.unit).unwrap_or(u64::MAX)

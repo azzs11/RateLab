@@ -146,6 +146,13 @@ pub trait CoordinationStrategy: Send {
 
     /// Periodic work (syncing counts, returning idle leases).
     fn on_tick(&mut self, _now: Nanos, _out: &mut Outbox) {}
+
+    /// Tokens this node could spend locally right now, summed over keys: its lease,
+    /// its share bucket or its synced estimate. 0 for strategies that hold nothing.
+    /// For observation only; it changes no state.
+    fn local_tokens(&self, _now: Nanos) -> u64 {
+        0
+    }
 }
 
 /// Names a strategy and its parameters, to build one per node.

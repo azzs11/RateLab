@@ -272,6 +272,17 @@ impl Leasing {
         }
     }
 
+    fn local_tokens(&self, now: Nanos) -> u64 {
+        self.keys
+            .values()
+            .filter(|l| match self.sizing {
+                Sizing::Fixed { .. } => now < l.expires,
+                Sizing::Adaptive(_) => true,
+            })
+            .map(|l| l.tokens)
+            .sum()
+    }
+
     fn on_tick(&mut self, now: Nanos, out: &mut Outbox) {
         let Sizing::Adaptive(p) = self.sizing else {
             return;
@@ -405,6 +416,9 @@ macro_rules! delegate {
             fn on_tick(&mut self, now: Nanos, out: &mut Outbox) {
                 self.0.on_tick(now, out);
             }
+            fn local_tokens(&self, now: Nanos) -> u64 {
+                self.0.local_tokens(now)
+            }
         }
     };
 }
@@ -532,6 +546,22 @@ mod tests {
             assert!(out.messages.is_empty());
             assert_eq!(out.decisions[0].1.allowed, allowed);
         }
+    }
+
+    #[test]
+    fn local_tokens_counts_unexpired_leases() {
+        let mut store = Store::new(config());
+        let mut node = FixedLeasing::new(
+            config(),
+            10,
+            Duration::from_millis(100),
+            FailurePolicy::FailOpen,
+        );
+        let mut out = Outbox::default();
+        node.on_request(Nanos::ZERO, 0, "k", Cost::ONE, &mut out);
+        settle(&mut node, &mut store, Nanos::ZERO, &mut out);
+        assert_eq!(node.local_tokens(Nanos::ZERO), 9);
+        assert_eq!(node.local_tokens(Nanos(100_000_000)), 0);
     }
 
     #[test]
