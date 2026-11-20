@@ -38,6 +38,7 @@ use drl_core::{Clock, Cost, Decision, ManualClock, Nanos, RateLimitConfig, RateL
 use std::time::Duration;
 
 pub mod cluster;
+pub mod metrics;
 mod scenarios;
 pub use scenarios::{diurnal, flash_crowd, merge, on_off, pareto, poisson};
 
