@@ -187,9 +187,21 @@ curl -i -H 'x-api-key: alice' localhost:3001/api/hello
 # RateLimit-Policy: "public";q=100;w=1
 # RateLimit: "public";r=99;t=1`;
 
-export default async function home(root: HTMLElement) {
-  const core = await wasm();
-  const attack = attackFigure(core);
+/** A placeholder that keeps its space until live content replaces it. */
+function slot(cls: string, label: string): HTMLElement {
+  return h("div", { class: `slot ${cls}`, role: "status", "aria-label": label }, h("span", { class: "slot-text" }, label));
+}
+
+export default function home(root: HTMLElement) {
+  // Everything that does not need WebAssembly renders at once; live parts fill reserved
+  // space when the module is ready, so nothing jumps.
+  const attackSlot = slot("attack-slot", "Loading the live figure…");
+  const cardsSlot = slot("cards-slot", "Measuring the five algorithms…");
+  const clusterSlot = slot("cluster-slot", "Simulating a cluster…");
+  const paretoSlot = slot("pareto-slot", "Loading benchmark results…");
+  let attack: ReturnType<typeof attackFigure> | null = null;
+  let io: IntersectionObserver | null = null;
+  let disposed = false;
 
   const hero = h(
     "section",
@@ -223,7 +235,7 @@ export default async function home(root: HTMLElement) {
         "1",
         "The boundary attack",
         "Each mark is a decision made by the real library, compiled to WebAssembly, running in this page.",
-        h("div", { class: "figure-body" }, attack.el),
+        h("div", { class: "figure-body" }, attackSlot),
       ),
     ),
   );
@@ -233,7 +245,7 @@ export default async function home(root: HTMLElement) {
     "01",
     "Five ways to count",
     "Every algorithm answers the same question: may this request go now? They disagree in the details, and the details are where limits leak.",
-    algorithmCards(core),
+    cardsSlot,
   );
 
   const cluster = section(
@@ -241,7 +253,7 @@ export default async function home(root: HTMLElement) {
     "02",
     "One limit, many nodes",
     "Put the limiter on three servers and it stops being a data structure. It becomes a protocol.",
-    clusterTeaser(core),
+    clusterSlot,
   );
 
   const price = section(
@@ -249,7 +261,7 @@ export default async function home(root: HTMLElement) {
     "03",
     "The price of exactness",
     "Asking the shared store on every request is exact and slow. Never asking is free and wrong. Leasing sits in between: how far in between is measured, not guessed.",
-    await paretoPreview(),
+    paretoSlot,
   );
 
   const use = section(
@@ -274,7 +286,39 @@ export default async function home(root: HTMLElement) {
 
   root.append(hero, lab, cluster, price, use);
 
+  void wasm().then((core) => {
+    if (disposed) return;
+    attack = attackFigure(core);
+    attackSlot.replaceWith(attack.el);
+    // The other live sections are computed only when they come near the screen, each
+    // in its own task, so the page stays responsive.
+    const fills = new Map<Element, () => Node>([
+      [cardsSlot, () => algorithmCards(core)],
+      [clusterSlot, () => clusterTeaser(core)],
+    ]);
+    io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const fill = fills.get(e.target);
+          if (!e.isIntersecting || !fill) continue;
+          fills.delete(e.target);
+          io?.unobserve(e.target);
+          setTimeout(() => {
+            if (!disposed) e.target.replaceWith(fill());
+          }, 0);
+        }
+      },
+      { rootMargin: "400px 0px" },
+    );
+    fills.forEach((_, el) => io?.observe(el));
+  });
+  void paretoPreview().then((el) => {
+    if (!disposed) paretoSlot.replaceWith(el);
+  });
+
   return () => {
-    attack.dispose();
+    disposed = true;
+    attack?.dispose();
+    io?.disconnect();
   };
 }

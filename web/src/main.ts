@@ -6,11 +6,25 @@ import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/views.css";
 
+import serifItalic from "@fontsource/instrument-serif/files/instrument-serif-latin-400-italic.woff2?url";
 import { h, html, replace } from "./lib/dom";
 import { icon } from "./lib/icons";
 import { applyStoredTheme, currentTheme, onThemeChange, toggleTheme } from "./lib/theme";
+import { wasm } from "./lib/wasm";
+import * as home from "./views/home";
 
 applyStoredTheme();
+// Start the WebAssembly download and the display font now, in parallel with rendering.
+void wasm();
+document.head.append(
+  Object.assign(document.createElement("link"), {
+    rel: "preload",
+    as: "font",
+    type: "font/woff2",
+    href: serifItalic,
+    crossOrigin: "anonymous",
+  }),
+);
 
 export type Dispose = () => void;
 export type View = (root: HTMLElement, params: URLSearchParams) => Dispose | Promise<Dispose>;
@@ -23,7 +37,7 @@ interface Route {
 }
 
 const ROUTES: Route[] = [
-  { path: "", label: "Story", title: "Rate limiting, measured", load: () => import("./views/home") },
+  { path: "", label: "Story", title: "Rate limiting, measured", load: () => Promise.resolve(home) },
   { path: "lab", label: "Lab", title: "Algorithm lab", load: () => import("./views/lab") },
   { path: "cluster", label: "Cluster", title: "Cluster simulator", load: () => import("./views/cluster") },
   { path: "explorer", label: "Explorer", title: "Strategy explorer", load: () => import("./views/explorer") },
@@ -86,6 +100,18 @@ app.append(
   ),
 );
 
+/** Horizontally scrolling tables and code must be reachable by keyboard. */
+function focusableScrollers(scope: ParentNode) {
+  scope.querySelectorAll<HTMLElement>(".table-wrap, pre").forEach((el) => {
+    if (el.hasAttribute("tabindex")) return;
+    el.tabIndex = 0;
+    el.setAttribute("role", "region");
+    const caption = el.querySelector("caption")?.textContent?.trim();
+    el.setAttribute("aria-label", caption || (el.tagName === "PRE" ? "Code example" : "Table"));
+  });
+}
+new MutationObserver(() => focusableScrollers(main)).observe(main, { childList: true, subtree: true });
+
 let dispose: Dispose | null = null;
 let generation = 0;
 
@@ -104,7 +130,7 @@ async function route() {
 
   dispose?.();
   dispose = null;
-  replace(main, h("div", { class: "page loading", role: "status" }, "Loading…"));
+  if (r.path) replace(main, h("div", { class: "page loading", role: "status" }, "Loading…"));
   try {
     const mod = await r.load();
     if (mine !== generation) return;
