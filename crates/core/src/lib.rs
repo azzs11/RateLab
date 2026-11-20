@@ -33,6 +33,7 @@ pub mod clock;
 pub mod concurrency;
 pub mod decision;
 pub mod strategies;
+pub mod tokens;
 pub mod units;
 
 pub use algorithms::{Algorithm, FixedWindow, Gcra, LeakyBucket, SlidingWindow, TokenBucket};
