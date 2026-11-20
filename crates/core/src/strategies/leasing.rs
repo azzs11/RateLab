@@ -3,7 +3,7 @@
 use super::{CoordinationStrategy, Message, MessageId, Outbox, RequestId, StoreOp, StoreReply};
 use crate::breaker::FailurePolicy;
 use crate::{Cost, Decision, Nanos, RateLimitConfig, Tokens};
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::time::Duration;
 
 /// How an [`AdaptiveLeasing`] node sizes its leases.
@@ -79,6 +79,8 @@ struct Leasing {
     /// Longest wait after the store had nothing to lease.
     max_backoff: Duration,
     keys: BTreeMap<String, KeyLease>,
+    /// Keys that may hold leased tokens: idle-return ticks visit only these.
+    holding: BTreeSet<String>,
     next: MessageId,
     pending: HashMap<MessageId, String>,
 }
@@ -96,6 +98,7 @@ impl Leasing {
             failure_backoff: config.window(),
             max_backoff: config.window() / 10,
             keys: BTreeMap::new(),
+            holding: BTreeSet::new(),
             next: 0,
             pending: HashMap::new(),
         }
@@ -231,6 +234,9 @@ impl Leasing {
         };
         let want = lease.pending.take().map_or(0, |(_, want)| want);
         lease.tokens += granted;
+        if granted > 0 && !self.holding.contains(&key) {
+            self.holding.insert(key.clone());
+        }
         lease.granted_at = Some(now);
         match sizing {
             Sizing::Fixed { ttl, .. } => lease.expires = now.saturating_add(ttl),
@@ -287,11 +293,18 @@ impl Leasing {
         let Sizing::Adaptive(p) = self.sizing else {
             return;
         };
-        for (key, lease) in &mut self.keys {
-            if lease.tokens == 0
-                || lease.pending.is_some()
-                || now.saturating_since(lease.last_request) < p.idle_return
-            {
+        // Same order as walking every key (sorted), but only keys that hold tokens.
+        let candidates: Vec<String> = self.holding.iter().cloned().collect();
+        for key in candidates {
+            let Some(lease) = self.keys.get_mut(&key) else {
+                self.holding.remove(&key);
+                continue;
+            };
+            if lease.tokens == 0 {
+                self.holding.remove(&key);
+                continue;
+            }
+            if lease.pending.is_some() || now.saturating_since(lease.last_request) < p.idle_return {
                 continue;
             }
             let msg = self.next;
@@ -306,6 +319,7 @@ impl Leasing {
             });
             lease.tokens = 0;
             lease.size = (lease.size / 2).max(p.min.max(1));
+            self.holding.remove(&key);
         }
     }
 }

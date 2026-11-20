@@ -3,7 +3,7 @@
 use super::bucket::ShareBucket;
 use super::{CoordinationStrategy, Message, MessageId, Outbox, RequestId, StoreOp, StoreReply};
 use crate::{Cost, Nanos, RateLimitConfig};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -51,6 +51,9 @@ pub struct AsyncSync {
     interval: Duration,
     /// Ordered, so syncs go out in the same order on every run.
     keys: BTreeMap<String, KeyState>,
+    /// Keys with spending not yet reported: ticks visit only these, so a tick costs
+    /// O(active keys), not O(every key ever seen).
+    dirty: BTreeSet<String>,
     next: MessageId,
     pending: HashMap<MessageId, (String, u64)>,
 }
@@ -63,6 +66,7 @@ impl AsyncSync {
             nodes: nodes.max(1),
             interval,
             keys: BTreeMap::new(),
+            dirty: BTreeSet::new(),
             next: 0,
             pending: HashMap::new(),
         }
@@ -91,6 +95,9 @@ impl CoordinationStrategy for AsyncSync {
         let allowed = state.estimate.try_take(cost.0);
         if allowed {
             state.unsynced += cost.0;
+            if !self.dirty.contains(key) {
+                self.dirty.insert(key.to_owned());
+            }
         }
         out.decisions
             .push((id, state.estimate.decision(allowed, cost.0)));
@@ -116,6 +123,7 @@ impl CoordinationStrategy for AsyncSync {
             // Not applied: report it again next time.
             state.in_flight = false;
             state.unsynced += sent;
+            self.dirty.insert(key);
         }
     }
 
@@ -128,9 +136,19 @@ impl CoordinationStrategy for AsyncSync {
     }
 
     fn on_tick(&mut self, _now: Nanos, out: &mut Outbox) {
-        for (key, state) in &mut self.keys {
-            if state.unsynced == 0 || state.in_flight {
+        // Same order as walking every key (sorted), but only the ones with work.
+        let candidates: Vec<String> = self.dirty.iter().cloned().collect();
+        for key in candidates {
+            let Some(state) = self.keys.get_mut(&key) else {
+                self.dirty.remove(&key);
                 continue;
+            };
+            if state.unsynced == 0 {
+                self.dirty.remove(&key);
+                continue;
+            }
+            if state.in_flight {
+                continue; // stays dirty: report after the reply
             }
             let msg = self.next;
             self.next += 1;
@@ -144,6 +162,7 @@ impl CoordinationStrategy for AsyncSync {
             });
             state.unsynced = 0;
             state.in_flight = true;
+            self.dirty.remove(&key);
         }
     }
 }
