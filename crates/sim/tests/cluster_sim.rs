@@ -126,3 +126,17 @@ fn ticks_stop_after_the_traffic() {
     assert_eq!(r.undecided, 0);
     assert!(r.messages_sent < 10);
 }
+
+#[test]
+fn the_message_log_records_requests_and_replies() {
+    let mut c = ClusterConfig::new(1);
+    c.record_messages = true;
+    c.outage = Some((Nanos(5 * MS), Nanos(6 * MS)));
+    let r = run(CENTRAL, 1_000, &c, &every(10, MS, 1));
+    assert_eq!(r.messages.len(), 10);
+    assert_eq!(r.messages.iter().filter(|m| m.handled.is_none()).count(), 1);
+    assert!(r.messages.iter().all(|m| m.node == 0));
+    // Off by default.
+    let quiet = run(CENTRAL, 1_000, &ClusterConfig::new(1), &every(10, MS, 1));
+    assert!(quiet.messages.is_empty());
+}

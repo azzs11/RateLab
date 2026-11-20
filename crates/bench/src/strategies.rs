@@ -538,6 +538,7 @@ mod tests {
             messages_sent: 0,
             store_ops: 0,
             timeouts: 0,
+            messages: Vec::new(),
         };
         let ideal = vec![true; a.len()];
         assert_eq!(rebalance_ms(&run, &ideal, 0, 1_000 * ms), Some(300.0));

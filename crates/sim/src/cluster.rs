@@ -40,7 +40,7 @@
 
 use crate::{Arrival, SplitMix64};
 use drl_core::strategies::{
-    CoordinationStrategy, Message, MessageId, Outbox, Store, StoreReply, Strategy,
+    CoordinationStrategy, Message, MessageId, Outbox, Store, StoreOp, StoreReply, Strategy,
 };
 use drl_core::{Decision, FailurePolicy, Nanos, RateLimitConfig};
 use std::cmp::Ordering;
@@ -64,6 +64,8 @@ pub struct ClusterConfig {
     pub outage: Option<(Nanos, Nanos)>,
     /// Seed for the jitter.
     pub seed: u64,
+    /// Keep a log of every message to the store (for visualisation).
+    pub record_messages: bool,
 }
 
 impl ClusterConfig {
@@ -77,6 +79,7 @@ impl ClusterConfig {
             skew_ns: Vec::new(),
             outage: None,
             seed: 0,
+            record_messages: false,
         }
     }
 }
@@ -110,6 +113,19 @@ impl Outcome {
     }
 }
 
+/// One message from a node to the store, when [`ClusterConfig::record_messages`] is on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MessageRecord {
+    /// When the node sent it (simulation time).
+    pub sent_at: Nanos,
+    /// The node that sent it.
+    pub node: usize,
+    /// What it asked for.
+    pub op: StoreOp,
+    /// When the store applied it and what it answered; `None` if it was lost.
+    pub handled: Option<(Nanos, StoreReply)>,
+}
+
 /// Everything one run produced.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClusterRun {
@@ -123,6 +139,8 @@ pub struct ClusterRun {
     pub store_ops: u64,
     /// Messages that timed out.
     pub timeouts: u64,
+    /// Every message, if recorded.
+    pub messages: Vec<MessageRecord>,
 }
 
 #[derive(Debug)]
@@ -132,6 +150,7 @@ enum Event {
         node: usize,
         msg: Message,
         sent: u64,
+        record: Option<usize>,
     },
     AtNode {
         node: usize,
@@ -187,6 +206,7 @@ struct Sim<'a> {
     messages_sent: u64,
     timeouts: u64,
     out: Outbox,
+    log: Vec<MessageRecord>,
 }
 
 impl Sim<'_> {
@@ -235,6 +255,15 @@ impl Sim<'_> {
         }
         for msg in out.messages.drain(..) {
             self.messages_sent += 1;
+            let record = self.cfg.record_messages.then(|| {
+                self.log.push(MessageRecord {
+                    sent_at: Nanos(now),
+                    node,
+                    op: msg.op,
+                    handled: None,
+                });
+                self.log.len() - 1
+            });
             let arrive = now + self.delay();
             self.push(
                 arrive,
@@ -242,6 +271,7 @@ impl Sim<'_> {
                     node,
                     msg,
                     sent: now,
+                    record,
                 },
             );
         }
@@ -261,13 +291,21 @@ impl Sim<'_> {
                 self.nodes[node].on_request(t, i as u64, &key, a.arrival.cost, &mut self.out);
                 self.flush(node, now);
             }
-            Event::AtStore { node, msg, sent } => {
+            Event::AtStore {
+                node,
+                msg,
+                sent,
+                record,
+            } => {
                 let timeout_at = sent + Nanos::from_duration(self.cfg.timeout).0;
                 if self.in_outage(now) {
                     self.push(timeout_at, Event::Timeout { node, id: msg.id });
                     return;
                 }
                 let reply = self.store.handle(Nanos(EPOCH + now), &msg.key, &msg.op);
+                if let Some(entry) = record.and_then(|i| self.log.get_mut(i)) {
+                    entry.handled = Some((Nanos(now), reply));
+                }
                 let back = now + self.delay();
                 if back > timeout_at {
                     self.push(timeout_at, Event::Timeout { node, id: msg.id });
@@ -334,6 +372,7 @@ pub fn run_cluster(
         messages_sent: 0,
         timeouts: 0,
         out: Outbox::default(),
+        log: Vec::new(),
     };
     for (i, a) in arrivals.iter().enumerate() {
         sim.push(a.arrival.at.0, Event::Arrive(i));
@@ -355,6 +394,7 @@ pub fn run_cluster(
         messages_sent: sim.messages_sent,
         store_ops: sim.store.ops(),
         timeouts: sim.timeouts,
+        messages: sim.log,
     }
 }
 
