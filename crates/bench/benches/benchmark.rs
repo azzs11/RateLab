@@ -1,6 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use distributed_rate_limiter::algorithms::*;
-use distributed_rate_limiter::{RateLimitConfig, RateLimiter};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use drl_core::algorithms::*;
+use drl_core::{RateLimitConfig, RateLimiter};
 
 fn benchmark_token_bucket(c: &mut Criterion) {
     let mut group = c.benchmark_group("token_bucket");

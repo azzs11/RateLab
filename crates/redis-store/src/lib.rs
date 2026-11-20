@@ -1,4 +1,4 @@
-use crate::{RateLimitConfig, RateLimiter, Result};
+use drl_core::{RateLimitConfig, RateLimiter, Result};
 use redis::{Client, Commands, Script};
 use std::time::SystemTime;
 
@@ -71,7 +71,7 @@ impl RedisRateLimiter {
 impl RateLimiter for RedisRateLimiter {
     fn allow_request(&mut self, key: &str) -> Result<bool> {
         let mut conn = self.client.get_connection().map_err(|e| {
-            crate::RateLimitError::ConfigError(format!("Redis connection failed: {}", e))
+            drl_core::RateLimitError::ConfigError(format!("Redis connection failed: {}", e))
         })?;
 
         let redis_key = format!("rate_limit:{}", key);
@@ -91,7 +91,9 @@ impl RateLimiter for RedisRateLimiter {
             .arg(now)
             .arg(ttl)
             .invoke(&mut conn)
-            .map_err(|e| crate::RateLimitError::ConfigError(format!("Lua script failed: {}", e)))?;
+            .map_err(|e| {
+                drl_core::RateLimitError::ConfigError(format!("Lua script failed: {}", e))
+            })?;
 
         Ok(allowed == 1)
     }

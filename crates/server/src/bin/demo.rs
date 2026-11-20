@@ -1,7 +1,7 @@
-use distributed_rate_limiter::algorithms::*;
-use distributed_rate_limiter::metrics::{self, record_request};
-use distributed_rate_limiter::redis_limiter::RedisRateLimiter;
-use distributed_rate_limiter::{RateLimitConfig, RateLimiter};
+use drl_core::algorithms::*;
+use drl_core::{RateLimitConfig, RateLimiter};
+use drl_redis_store::RedisRateLimiter;
+use server::metrics::{self, record_request};
 use std::time::{Duration, Instant};
 
 #[tokio::main]

@@ -1,5 +1,5 @@
-use distributed_rate_limiter::algorithms::*;
-use distributed_rate_limiter::{RateLimitConfig, RateLimiter};
+use drl_core::algorithms::*;
+use drl_core::{RateLimitConfig, RateLimiter};
 use std::time::Instant;
 
 #[test]
