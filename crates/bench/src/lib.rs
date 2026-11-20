@@ -13,6 +13,7 @@
 //! - [`overload`]: no limit, static, AIMD and Gradient2 concurrency limits in front of a
 //!   backend with limited capacity, simulated and on the real Tower layer;
 //! - [`real_traffic`]: every algorithm and strategy on a public request log ([`traces`]);
+//! - [`story`]: fills the report and article templates with measured numbers;
 //! - [`report`]: turns `results/*.json` into RESULTS.md and the README table, with the
 //!   [`machine`] each file was measured on.
 
@@ -30,6 +31,7 @@ pub mod real_traffic;
 pub mod report;
 pub mod results;
 pub mod stats;
+pub mod story;
 pub mod strategies;
 pub mod svg;
 pub mod traces;

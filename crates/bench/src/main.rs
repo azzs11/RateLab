@@ -97,6 +97,19 @@ enum Command {
     },
     /// Print this machine's description (used to label the Docker run).
     Machine,
+    /// List every number the prose templates can use, with its current value.
+    Facts {
+        /// Folder with the JSON files.
+        #[arg(long, default_value = "results")]
+        dir: PathBuf,
+    },
+    /// Fill the prose templates with measured numbers: docs/report/*.tmpl.md into
+    /// docs/report/, and docs/story/*.tmpl.md into target/story/ (not committed).
+    Story {
+        /// Folder with the JSON files.
+        #[arg(long, default_value = "results")]
+        dir: PathBuf,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -115,6 +128,13 @@ fn main() -> anyhow::Result<()> {
             out,
         } => run_overload(quick, sim_only, &out),
         Command::Report { dir, readme } => run_report(&dir, &readme),
+        Command::Facts { dir } => {
+            for (k, v) in bench::story::facts(&load_inputs(&dir)?) {
+                println!("{k} = {v}");
+            }
+            Ok(())
+        }
+        Command::Story { dir } => run_story(&dir),
         Command::Machine => {
             let m = Machine::detect();
             println!("{} · commit `{}`", m.one_line(), m.git_commit);
@@ -355,8 +375,8 @@ fn run_traces(quick: bool, out: &std::path::Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_report(dir: &std::path::Path, readme: &std::path::Path) -> anyhow::Result<()> {
-    let inputs = Inputs {
+fn load_inputs(dir: &std::path::Path) -> anyhow::Result<Inputs> {
+    Ok(Inputs {
         local: read_json(&dir.join("local.json"))?,
         memory: read_json(&dir.join("memory.json"))?,
         cluster: read_json(&dir.join("cluster.json"))?,
@@ -365,7 +385,58 @@ fn run_report(dir: &std::path::Path, readme: &std::path::Path) -> anyhow::Result
         real_strategies: read_json(&dir.join("real_strategies.json"))?,
         overload: read_json(&dir.join("overload.json"))?,
         llm: read_json(&dir.join("llm.json"))?,
-    };
+    })
+}
+
+/// Renders every `*.tmpl.md` in `from` into `to`, dropping `.tmpl`.
+fn render_dir(
+    facts: &bench::story::Facts,
+    from: &std::path::Path,
+    to: &std::path::Path,
+) -> anyhow::Result<()> {
+    if !from.is_dir() {
+        return Ok(());
+    }
+    std::fs::create_dir_all(to)?;
+    let mut entries: Vec<_> = std::fs::read_dir(from)?
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .collect();
+    entries.sort();
+    for path in entries {
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        let Some(stem) = name.strip_suffix(".tmpl.md") else {
+            continue;
+        };
+        let text =
+            std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+        let out = bench::story::render(&text, facts)
+            .with_context(|| format!("render {}", path.display()))?;
+        let dest = to.join(format!("{stem}.md"));
+        std::fs::write(&dest, out).with_context(|| format!("write {}", dest.display()))?;
+        eprintln!("wrote {}", dest.display());
+    }
+    Ok(())
+}
+
+fn run_story(dir: &std::path::Path) -> anyhow::Result<()> {
+    let facts = bench::story::facts(&load_inputs(dir)?);
+    render_dir(
+        &facts,
+        std::path::Path::new("docs/report"),
+        std::path::Path::new("docs/report"),
+    )?;
+    render_dir(
+        &facts,
+        std::path::Path::new("docs/story"),
+        std::path::Path::new("target/story"),
+    )
+}
+
+fn run_report(dir: &std::path::Path, readme: &std::path::Path) -> anyhow::Result<()> {
+    let inputs = load_inputs(dir)?;
     for (name, svg) in report::charts(&inputs) {
         let path = dir.join(&name);
         std::fs::write(&path, svg).with_context(|| format!("write {}", path.display()))?;
