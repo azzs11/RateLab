@@ -7,7 +7,7 @@
 
 use crate::oracle::{ExactOracle, compare};
 use crate::stats::{Summary, jain, percentile};
-use drl_core::{Algorithm, Cost, ManualClock, MonotonicClock, Nanos, RateLimitConfig, RateLimiter};
+use ratelab::{Algorithm, Cost, ManualClock, MonotonicClock, Nanos, RateLimitConfig, RateLimiter};
 use serde::{Deserialize, Serialize};
 use sim::{Arrival, SplitMix64};
 use std::hint::black_box;

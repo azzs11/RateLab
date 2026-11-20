@@ -2,7 +2,7 @@
 //! limit, AIMD or Gradient2, from [`sim::overload`]. The same model as the benchmark's
 //! simulated runs, with the scenario's knobs exposed.
 
-use drl_core::concurrency::{AimdConfig, Concurrency, ConcurrencyLimiter, Gradient2Config};
+use ratelab::concurrency::{AimdConfig, Concurrency, ConcurrencyLimiter, Gradient2Config};
 use sim::overload::{OverloadConfig, measure, requests, run};
 use std::time::Duration;
 use wasm_bindgen::prelude::*;
@@ -138,7 +138,7 @@ impl OverloadRun {
             workers: m
                 .series
                 .iter()
-                .map(|b| c.workers_at(drl_core::Nanos((b.start_secs * 1e9) as u64)) as f64)
+                .map(|b| c.workers_at(ratelab::Nanos((b.start_secs * 1e9) as u64)) as f64)
                 .collect(),
             goodput_pct: m.goodput_pct,
             p50_ms: m.p50_ms,

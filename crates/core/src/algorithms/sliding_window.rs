@@ -20,7 +20,7 @@ struct Log {
 /// price is memory: up to `limit` entries per key.
 ///
 /// ```
-/// use drl_core::{Cost, ManualClock, RateLimitConfig, RateLimiter, SlidingWindow};
+/// use ratelab::{Cost, ManualClock, RateLimitConfig, RateLimiter, SlidingWindow};
 /// use std::time::Duration;
 ///
 /// let clock = ManualClock::new();
@@ -32,7 +32,7 @@ struct Log {
 ///
 /// clock.advance(Duration::from_millis(400)); // the first request leaves the window
 /// assert!(limiter.check("k", Cost::ONE).allowed);
-/// # Ok::<(), drl_core::ConfigError>(())
+/// # Ok::<(), ratelab::ConfigError>(())
 /// ```
 #[derive(Debug)]
 pub struct SlidingWindow<C> {

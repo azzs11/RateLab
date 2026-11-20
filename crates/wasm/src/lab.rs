@@ -6,7 +6,7 @@
 //! theoretical arrival time.
 
 use crate::traffic::{Traffic, config, ms_to_nanos};
-use drl_core::{Algorithm, Cost, ManualClock, Nanos};
+use ratelab::{Algorithm, Cost, ManualClock, Nanos};
 use sim::{Step, Trace};
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;

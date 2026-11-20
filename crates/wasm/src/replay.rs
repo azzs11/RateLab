@@ -3,7 +3,7 @@
 
 use crate::cluster::{ClusterOptions, ClusterView, STRATEGIES};
 use crate::traffic::{Traffic, config};
-use drl_core::{Algorithm, ManualClock};
+use ratelab::{Algorithm, ManualClock};
 use sim::Arrival;
 use std::collections::HashMap;
 use std::sync::Arc;

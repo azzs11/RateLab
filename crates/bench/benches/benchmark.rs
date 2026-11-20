@@ -1,5 +1,5 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
-use drl_core::{Algorithm, Cost, MonotonicClock, RateLimitConfig};
+use ratelab::{Algorithm, Cost, MonotonicClock, RateLimitConfig};
 use std::hint::black_box;
 
 /// Single-threaded decision time for one hot key, per algorithm and limit.

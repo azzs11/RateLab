@@ -12,14 +12,14 @@ use std::collections::HashMap;
 /// The global limit, one bucket per key.
 ///
 /// ```
-/// use drl_core::strategies::{Store, StoreOp, StoreReply};
-/// use drl_core::{Nanos, RateLimitConfig};
+/// use ratelab::strategies::{Store, StoreOp, StoreReply};
+/// use ratelab::{Nanos, RateLimitConfig};
 ///
 /// let mut store = Store::new(RateLimitConfig::per_second(10)?);
 /// let reply = store.handle(Nanos::ZERO, "k", &StoreOp::Lease { want: 4 });
 /// assert_eq!(reply, StoreReply::Leased { granted: 4, retry_after: None });
 /// assert_eq!(store.tokens(Nanos::ZERO, "k"), 6);
-/// # Ok::<(), drl_core::ConfigError>(())
+/// # Ok::<(), ratelab::ConfigError>(())
 /// ```
 #[derive(Debug, Clone)]
 pub struct Store {

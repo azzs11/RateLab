@@ -19,7 +19,7 @@ struct Window {
 /// the start of the next, so a short span can admit up to `2 × limit`.
 ///
 /// ```
-/// use drl_core::{Cost, FixedWindow, ManualClock, RateLimitConfig, RateLimiter};
+/// use ratelab::{Cost, FixedWindow, ManualClock, RateLimitConfig, RateLimiter};
 /// use std::time::Duration;
 ///
 /// let clock = ManualClock::new();
@@ -29,7 +29,7 @@ struct Window {
 ///
 /// clock.advance(Duration::from_secs(1)); // next window
 /// assert!(limiter.check("k", Cost(3)).allowed);
-/// # Ok::<(), drl_core::ConfigError>(())
+/// # Ok::<(), ratelab::ConfigError>(())
 /// ```
 #[derive(Debug)]
 pub struct FixedWindow<C> {

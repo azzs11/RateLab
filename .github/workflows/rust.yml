@@ -36,7 +36,7 @@ jobs:
     - name: No sleeps in library or test code
       run: |
         if grep -rn "sleep(" crates/core crates/sim crates/wasm crates/redis-store crates/bench/benches; then
-          echo "Tests must use the mock clock (drl_core::ManualClock), not sleep." >&2
+          echo "Tests must use the mock clock (ratelab::ManualClock), not sleep." >&2
           exit 1
         fi
 

@@ -1,6 +1,6 @@
 [package]
 name = "wasm"
-description = "WebAssembly bindings for drl-core, for the browser playground."
+description = "WebAssembly bindings for ratelab, for the browser playground."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # wasm32-unknown-unknown has no system clock: time is passed in from JavaScript.
-drl-core.workspace = true
+ratelab.workspace = true
 sim = { path = "../sim" }
 wasm-bindgen = "0.2.130"
 

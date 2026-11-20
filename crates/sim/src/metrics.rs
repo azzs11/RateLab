@@ -9,7 +9,7 @@
 
 use crate::cluster::{ClusterArrival, ClusterRun};
 use crate::{Step, Trace};
-use drl_core::{Algorithm, ManualClock, RateLimitConfig};
+use ratelab::{Algorithm, ManualClock, RateLimitConfig};
 use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::Arc;
@@ -26,7 +26,7 @@ pub fn percentile(sorted: &[u64], p: f64) -> u64 {
 /// Decisions of the ideal (one exact token bucket) on the same arrival times.
 ///
 /// ```
-/// use drl_core::{Cost, Nanos, RateLimitConfig};
+/// use ratelab::{Cost, Nanos, RateLimitConfig};
 /// use sim::cluster::ClusterArrival;
 /// use sim::Arrival;
 ///
@@ -35,7 +35,7 @@ pub fn percentile(sorted: &[u64], p: f64) -> u64 {
 ///     .map(|i| ClusterArrival { arrival: Arrival { at: Nanos(i), key: 0, cost: Cost::ONE }, node: 0 })
 ///     .collect();
 /// assert_eq!(sim::metrics::ideal(config, &a), [true, false]);
-/// # Ok::<(), drl_core::ConfigError>(())
+/// # Ok::<(), ratelab::ConfigError>(())
 /// ```
 pub fn ideal(config: RateLimitConfig, a: &[ClusterArrival]) -> Vec<bool> {
     let clock = Arc::new(ManualClock::new());
@@ -177,7 +177,7 @@ pub fn measure(run: &ClusterRun, ideal: &[bool], config: RateLimitConfig) -> Mea
 #[cfg(test)]
 mod tests {
     use super::*;
-    use drl_core::Nanos;
+    use ratelab::Nanos;
     use std::time::Duration;
 
     #[test]
@@ -187,14 +187,14 @@ mod tests {
             arrival: crate::Arrival {
                 at: Nanos(at),
                 key: 0,
-                cost: drl_core::Cost::ONE,
+                cost: ratelab::Cost::ONE,
             },
             node: 0,
             decided_at: Nanos(at),
             decision: if allowed {
-                drl_core::Decision::allow(drl_core::Tokens(0), Duration::ZERO)
+                ratelab::Decision::allow(ratelab::Tokens(0), Duration::ZERO)
             } else {
-                drl_core::Decision::deny(drl_core::Tokens(0), Duration::ZERO, None)
+                ratelab::Decision::deny(ratelab::Tokens(0), Duration::ZERO, None)
             },
         };
         let run = |allowed: [bool; 4]| ClusterRun {

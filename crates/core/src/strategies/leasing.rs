@@ -27,12 +27,12 @@ impl AdaptiveParams {
     /// window idle.
     ///
     /// ```
-    /// use drl_core::strategies::AdaptiveParams;
-    /// use drl_core::RateLimitConfig;
+    /// use ratelab::strategies::AdaptiveParams;
+    /// use ratelab::RateLimitConfig;
     ///
     /// let p = AdaptiveParams::for_cluster(RateLimitConfig::per_second(100)?, 3);
     /// assert_eq!((p.start, p.min, p.max), (4, 1, 50));
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn for_cluster(config: RateLimitConfig, nodes: u64) -> Self {
         let limit = config.limit();
@@ -330,8 +330,8 @@ impl Leasing {
 /// being fetched wait for it.
 ///
 /// ```
-/// use drl_core::strategies::{CoordinationStrategy, FixedLeasing, Outbox, Store};
-/// use drl_core::{Cost, FailurePolicy, Nanos, RateLimitConfig};
+/// use ratelab::strategies::{CoordinationStrategy, FixedLeasing, Outbox, Store};
+/// use ratelab::{Cost, FailurePolicy, Nanos, RateLimitConfig};
 /// use std::time::Duration;
 ///
 /// let config = RateLimitConfig::per_second(100)?;
@@ -351,7 +351,7 @@ impl Leasing {
 /// }
 /// assert!(out.messages.is_empty());
 /// assert_eq!(store.tokens(Nanos::ZERO, "k"), 90);
-/// # Ok::<(), drl_core::ConfigError>(())
+/// # Ok::<(), ratelab::ConfigError>(())
 /// ```
 #[derive(Debug)]
 pub struct FixedLeasing(Leasing);
@@ -369,8 +369,8 @@ impl FixedLeasing {
 /// borrow more; idle nodes do not hoard.
 ///
 /// ```
-/// use drl_core::strategies::{AdaptiveLeasing, AdaptiveParams, CoordinationStrategy, Outbox, Store};
-/// use drl_core::{Cost, FailurePolicy, Nanos, RateLimitConfig};
+/// use ratelab::strategies::{AdaptiveLeasing, AdaptiveParams, CoordinationStrategy, Outbox, Store};
+/// use ratelab::{Cost, FailurePolicy, Nanos, RateLimitConfig};
 ///
 /// let config = RateLimitConfig::per_second(100)?;
 /// let mut store = Store::new(config);
@@ -389,7 +389,7 @@ impl FixedLeasing {
 /// let m = out.messages.pop().unwrap();
 /// store.handle(Nanos(500_000_000), &m.key, &m.op);
 /// assert_eq!(store.tokens(Nanos(500_000_000), "k"), 100);
-/// # Ok::<(), drl_core::ConfigError>(())
+/// # Ok::<(), ratelab::ConfigError>(())
 /// ```
 #[derive(Debug)]
 pub struct AdaptiveLeasing(Leasing);

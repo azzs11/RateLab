@@ -1,8 +1,8 @@
 //! The behaviour contract every coordination strategy must meet, run against all five
 //! in the simulator.
 
-use drl_core::strategies::Strategy;
-use drl_core::{Algorithm, Cost, FailurePolicy, ManualClock, Nanos, RateLimitConfig};
+use ratelab::strategies::Strategy;
+use ratelab::{Algorithm, Cost, FailurePolicy, ManualClock, Nanos, RateLimitConfig};
 use sim::cluster::{ClusterArrival, ClusterConfig, ClusterRun, place, run_cluster};
 use std::sync::Arc;
 use std::time::Duration;

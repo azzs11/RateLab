@@ -14,7 +14,7 @@ use dashmap::DashMap;
 /// per key instead of a level and a timestamp.
 ///
 /// ```
-/// use drl_core::{Cost, Gcra, ManualClock, RateLimitConfig, RateLimiter};
+/// use ratelab::{Cost, Gcra, ManualClock, RateLimitConfig, RateLimiter};
 /// use std::time::Duration;
 ///
 /// let clock = ManualClock::new();
@@ -25,7 +25,7 @@ use dashmap::DashMap;
 ///
 /// clock.advance(Duration::from_millis(250));
 /// assert!(limiter.check("k", Cost::ONE).allowed);
-/// # Ok::<(), drl_core::ConfigError>(())
+/// # Ok::<(), ratelab::ConfigError>(())
 /// ```
 #[derive(Debug)]
 pub struct Gcra<C> {

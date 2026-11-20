@@ -40,7 +40,7 @@ impl BreakerConfig {
     /// Opens after `failure_threshold` consecutive failures and stays open for `open_for`.
     ///
     /// ```
-    /// use drl_core::breaker::{BreakerConfig, BreakerConfigError};
+    /// use ratelab::breaker::{BreakerConfig, BreakerConfigError};
     /// use std::time::Duration;
     ///
     /// let config = BreakerConfig::new(3, Duration::from_millis(500))?;
@@ -87,7 +87,7 @@ impl BreakerState {
     /// Lower-case name, as used in logs and metrics.
     ///
     /// ```
-    /// use drl_core::breaker::BreakerState;
+    /// use ratelab::breaker::BreakerState;
     /// assert_eq!(BreakerState::HalfOpen.name(), "half_open");
     /// ```
     pub fn name(self) -> &'static str {
@@ -116,8 +116,8 @@ pub struct Rejected {
 /// A thread-safe circuit breaker.
 ///
 /// ```
-/// use drl_core::breaker::{BreakerConfig, BreakerState, CircuitBreaker};
-/// use drl_core::ManualClock;
+/// use ratelab::breaker::{BreakerConfig, BreakerState, CircuitBreaker};
+/// use ratelab::ManualClock;
 /// use std::time::Duration;
 ///
 /// let clock = ManualClock::new();
@@ -132,7 +132,7 @@ pub struct Rejected {
 /// assert!(breaker.acquire().is_ok()); // the probe
 /// breaker.record_success();
 /// assert_eq!(breaker.state(), BreakerState::Closed);
-/// # Ok::<(), drl_core::breaker::BreakerConfigError>(())
+/// # Ok::<(), ratelab::breaker::BreakerConfigError>(())
 /// ```
 #[derive(Debug)]
 pub struct CircuitBreaker<C> {
@@ -246,7 +246,7 @@ impl FailurePolicy {
     /// Lower-case name: `open` or `closed`.
     ///
     /// ```
-    /// use drl_core::breaker::FailurePolicy;
+    /// use ratelab::breaker::FailurePolicy;
     /// assert_eq!(FailurePolicy::FailClosed.name(), "closed");
     /// assert_eq!("open".parse::<FailurePolicy>(), Ok(FailurePolicy::FailOpen));
     /// ```
@@ -261,7 +261,7 @@ impl FailurePolicy {
     /// a denied caller.
     ///
     /// ```
-    /// use drl_core::breaker::FailurePolicy;
+    /// use ratelab::breaker::FailurePolicy;
     /// use std::time::Duration;
     ///
     /// assert!(FailurePolicy::FailOpen.decide(Duration::from_secs(1)).allowed);

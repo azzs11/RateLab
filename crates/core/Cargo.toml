@@ -1,5 +1,5 @@
 [package]
-name = "drl-core"
+name = "ratelab"
 description = "Rate limiting algorithms (token bucket, leaky bucket, fixed and sliding window, GCRA)."
 version.workspace = true
 edition.workspace = true

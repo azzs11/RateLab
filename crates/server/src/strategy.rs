@@ -1,4 +1,4 @@
-//! Runs a `drl_core` coordination strategy for real: this node's half of the protocol in
+//! Runs a `ratelab` coordination strategy for real: this node's half of the protocol in
 //! memory, the shared store in Redis (`RedisRateLimiter::apply`).
 //!
 //! The strategy itself does no I/O. This driver gives it the time, sends its messages to
@@ -6,9 +6,9 @@
 //! wakes each waiting request when its decision is made. Most requests are decided
 //! immediately; a request waits only when the strategy is fetching from the store.
 
-use drl_core::strategies::{CoordinationStrategy, Outbox, RequestId, Strategy};
-use drl_core::{Cost, Decision, FailurePolicy, Nanos, RateLimitConfig};
 use drl_redis_store::RedisRateLimiter;
+use ratelab::strategies::{CoordinationStrategy, Outbox, RequestId, Strategy};
+use ratelab::{Cost, Decision, FailurePolicy, Nanos, RateLimitConfig};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};

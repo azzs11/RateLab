@@ -10,7 +10,7 @@ publish = false
 default-run = "bench"
 
 [dependencies]
-drl-core = { workspace = true, features = ["std-clock"] }
+ratelab = { workspace = true, features = ["std-clock"] }
 sim = { path = "../sim" }
 server = { path = "../server" }
 anyhow = "1.0"

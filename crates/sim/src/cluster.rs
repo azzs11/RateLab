@@ -13,8 +13,8 @@
 //!   clock, like Redis `TIME`.
 //!
 //! ```
-//! use drl_core::strategies::Strategy;
-//! use drl_core::{Cost, FailurePolicy, Nanos, RateLimitConfig};
+//! use ratelab::strategies::Strategy;
+//! use ratelab::{Cost, FailurePolicy, Nanos, RateLimitConfig};
 //! use sim::cluster::{ClusterArrival, ClusterConfig, run_cluster};
 //! use sim::Arrival;
 //!
@@ -35,14 +35,14 @@
 //! let allowed: Vec<bool> = run.outcomes.iter().map(|o| o.decision.allowed).collect();
 //! assert_eq!(allowed, [true, true, false]); // one shared limit of 2
 //! assert_eq!(run.store_ops, 3);
-//! # Ok::<(), drl_core::ConfigError>(())
+//! # Ok::<(), ratelab::ConfigError>(())
 //! ```
 
 use crate::{Arrival, SplitMix64};
-use drl_core::strategies::{
+use ratelab::strategies::{
     CoordinationStrategy, Message, MessageId, Outbox, Store, StoreOp, StoreReply, Strategy,
 };
-use drl_core::{Decision, FailurePolicy, Nanos, RateLimitConfig};
+use ratelab::{Decision, FailurePolicy, Nanos, RateLimitConfig};
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::time::Duration;

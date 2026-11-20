@@ -3,7 +3,7 @@
 //! The rule: **a key never gets more than `limit` units in any time span of length
 //! `window`**. The oracle sees each request in order and admits it exactly when doing
 //! so keeps that rule. It is written as plainly as possible (a log of admitted
-//! requests per key, scanned directly) and shares no code with `drl-core`, so it also
+//! requests per key, scanned directly) and shares no code with `ratelab`, so it also
 //! checks the library's own sliding window.
 
 use sim::{Arrival, Trace};
@@ -113,7 +113,7 @@ pub fn compare(trace: &Trace, oracle: &[bool], limit: u64, window_ns: u64) -> Ac
 #[cfg(test)]
 mod tests {
     use super::*;
-    use drl_core::{Algorithm, Cost, ManualClock, Nanos, RateLimitConfig};
+    use ratelab::{Algorithm, Cost, ManualClock, Nanos, RateLimitConfig};
     use std::sync::Arc;
     use std::time::Duration;
 

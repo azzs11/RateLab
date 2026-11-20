@@ -6,8 +6,8 @@
 //! only has its estimate, which is the whole problem.
 //!
 //! ```
-//! use drl_core::tokens::{Accounting, ModelPolicy, TokenPolicy};
-//! use drl_core::RateLimitConfig;
+//! use ratelab::tokens::{Accounting, ModelPolicy, TokenPolicy};
+//! use ratelab::RateLimitConfig;
 //! use sim::tokens::{measure, run, synthetic, Streaming, SynthModel};
 //! use std::time::Duration;
 //!
@@ -23,13 +23,13 @@
 //! let r = run(&policy, &["m"], &reqs, stream, None);
 //! let m = measure(&policy, &["m"], &reqs, &r, Duration::from_secs(120));
 //! assert!(m.overspend_pct > 0.0); // estimates are never corrected
-//! # Ok::<(), drl_core::ConfigError>(())
+//! # Ok::<(), ratelab::ConfigError>(())
 //! ```
 
 use crate::SplitMix64;
 use crate::scenarios::{exponential_q32, pareto2_q32, scale};
-use drl_core::tokens::{TokenLimiter, TokenPolicy, TokenRequest, TokenTicket};
-use drl_core::{ManualClock, Nanos};
+use ratelab::tokens::{TokenLimiter, TokenPolicy, TokenRequest, TokenTicket};
+use ratelab::{ManualClock, Nanos};
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::sync::Arc;
@@ -68,7 +68,7 @@ impl Streaming {
     /// # use sim::tokens::Streaming;
     /// # use std::time::Duration;
     /// let s = Streaming { first_token: Duration::from_millis(100), per_token: Duration::from_millis(10) };
-    /// assert_eq!(s.done(drl_core::Nanos(0), 5), drl_core::Nanos(150_000_000));
+    /// assert_eq!(s.done(ratelab::Nanos(0), 5), ratelab::Nanos(150_000_000));
     /// ```
     pub fn done(&self, at: Nanos, output: u64) -> Nanos {
         let per = u64::try_from(self.per_token.as_nanos()).unwrap_or(u64::MAX);
@@ -473,7 +473,7 @@ pub fn wrongly_blocked_pct(run: &TokenRun, oracle: &TokenRun) -> f64 {
 ///
 /// ```
 /// # use sim::tokens::{oracle_requests, LlmRequest};
-/// let r = [LlmRequest { at: drl_core::Nanos(0), tenant: 0, model: 0, input: 5, output: 42, max_output: None }];
+/// let r = [LlmRequest { at: ratelab::Nanos(0), tenant: 0, model: 0, input: 5, output: 42, max_output: None }];
 /// assert_eq!(oracle_requests(&r)[0].max_output, Some(42));
 /// ```
 pub fn oracle_requests(requests: &[LlmRequest]) -> Vec<LlmRequest> {
@@ -489,8 +489,8 @@ pub fn oracle_requests(requests: &[LlmRequest]) -> Vec<LlmRequest> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use drl_core::RateLimitConfig;
-    use drl_core::tokens::{Accounting, ModelPolicy};
+    use ratelab::RateLimitConfig;
+    use ratelab::tokens::{Accounting, ModelPolicy};
 
     const MODELS: [&str; 1] = ["m"];
 

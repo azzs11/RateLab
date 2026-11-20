@@ -11,8 +11,8 @@ use std::time::Duration;
 /// decides.
 ///
 /// ```
-/// use drl_core::strategies::{CentralExact, CoordinationStrategy, Outbox, Store};
-/// use drl_core::{Cost, FailurePolicy, Nanos, RateLimitConfig};
+/// use ratelab::strategies::{CentralExact, CoordinationStrategy, Outbox, Store};
+/// use ratelab::{Cost, FailurePolicy, Nanos, RateLimitConfig};
 ///
 /// let mut store = Store::new(RateLimitConfig::per_second(1)?);
 /// let mut node = CentralExact::new(FailurePolicy::FailClosed, false);
@@ -23,7 +23,7 @@ use std::time::Duration;
 /// node.on_reply(Nanos::ZERO, msg.id, reply, &mut out);
 /// assert_eq!(out.decisions[0].0, 7);
 /// assert!(out.decisions[0].1.allowed);
-/// # Ok::<(), drl_core::ConfigError>(())
+/// # Ok::<(), ratelab::ConfigError>(())
 /// ```
 #[derive(Debug)]
 pub struct CentralExact {

@@ -1,7 +1,7 @@
 // Instrument: tokens. An LLM request's cost is known only after its answer has
 // streamed, so a limiter has to charge before it knows. Part 1 sends one stream of
 // requests to three limiters at once, live; part 2 runs an hour of traffic through
-// all three and an oracle. Everything is drl_core::tokens and sim::tokens in WASM.
+// all three and an oracle. Everything is ratelab::tokens and sim::tokens in WASM.
 
 import { figure } from "../components/figure";
 import { lineChart, type Series } from "../components/lines";

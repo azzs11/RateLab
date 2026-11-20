@@ -24,8 +24,8 @@ use crate::machine::Machine;
 use crate::stats::Summary;
 use crate::traces::{TraceFile, days_from_civil, fetch};
 use anyhow::bail;
-use drl_core::tokens::{Accounting, ModelPolicy, TokenLimiter, TokenPolicy};
-use drl_core::{Nanos, RateLimitConfig};
+use ratelab::tokens::{Accounting, ModelPolicy, TokenLimiter, TokenPolicy};
+use ratelab::{Nanos, RateLimitConfig};
 use serde::{Deserialize, Serialize};
 use server::llm::{MockModel, TokenLimitLayer, mock_router};
 use sim::tokens::{
@@ -467,12 +467,12 @@ pub fn speed_up(reqs: &[LlmRequest], speedup: u64) -> Vec<LlmRequest> {
         .collect()
 }
 
-/// Tokio's clock as a [`drl_core::Clock`]: real time normally, and exact virtual time
+/// Tokio's clock as a [`ratelab::Clock`]: real time normally, and exact virtual time
 /// when Tokio's clock is paused (in tests), so the limiter and the mock model agree.
 #[derive(Debug, Clone, Copy)]
 pub struct TokioClock(tokio::time::Instant);
 
-impl drl_core::Clock for TokioClock {
+impl ratelab::Clock for TokioClock {
     fn now(&self) -> Nanos {
         Nanos(u64::try_from(self.0.elapsed().as_nanos()).unwrap_or(u64::MAX))
     }

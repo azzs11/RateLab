@@ -1,6 +1,6 @@
 [package]
 name = "drl-redis-store"
-description = "Redis-backed token bucket for drl-core: EVALSHA, Redis TIME, circuit breaker."
+description = "Redis-backed token bucket for ratelab: EVALSHA, Redis TIME, circuit breaker."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,7 +8,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-drl-core.workspace = true
+ratelab.workspace = true
 thiserror.workspace = true
 redis = { version = "1.8", default-features = false, features = ["script", "tokio-comp", "connection-manager"] }
 

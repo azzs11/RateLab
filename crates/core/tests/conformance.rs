@@ -1,7 +1,7 @@
 //! Shared conformance suite: one behaviour contract, run against every algorithm in
 //! `Algorithm::ALL`. Time comes from a `ManualClock`; nothing sleeps.
 
-use drl_core::{Algorithm, Cost, ManualClock, RateLimitConfig, RateLimiter, Tokens};
+use ratelab::{Algorithm, Cost, ManualClock, RateLimitConfig, RateLimiter, Tokens};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;

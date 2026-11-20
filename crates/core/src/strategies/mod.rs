@@ -185,7 +185,7 @@ impl Strategy {
     /// Snake-case name.
     ///
     /// ```
-    /// use drl_core::strategies::Strategy;
+    /// use ratelab::strategies::Strategy;
     /// assert_eq!(Strategy::LocalSplit.name(), "local_split");
     /// ```
     pub fn name(&self) -> &'static str {
@@ -206,8 +206,8 @@ impl Strategy {
     /// - adaptive leasing with [`AdaptiveParams::for_cluster`].
     ///
     /// ```
-    /// use drl_core::strategies::Strategy;
-    /// use drl_core::RateLimitConfig;
+    /// use ratelab::strategies::Strategy;
+    /// use ratelab::RateLimitConfig;
     ///
     /// let names: Vec<_> = Strategy::defaults(RateLimitConfig::per_second(100)?, 3)
     ///     .iter()
@@ -217,7 +217,7 @@ impl Strategy {
     ///     names,
     ///     ["central_exact", "local_split", "async_sync", "fixed_leasing", "adaptive_leasing"]
     /// );
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn defaults(config: RateLimitConfig, nodes: u64) -> [Strategy; 5] {
         let nodes = nodes.max(1);
@@ -238,8 +238,8 @@ impl Strategy {
     /// One node's instance, for a cluster of `nodes` nodes enforcing `config`.
     ///
     /// ```
-    /// use drl_core::strategies::{Outbox, Strategy};
-    /// use drl_core::{Cost, FailurePolicy, Nanos, RateLimitConfig};
+    /// use ratelab::strategies::{Outbox, Strategy};
+    /// use ratelab::{Cost, FailurePolicy, Nanos, RateLimitConfig};
     ///
     /// let mut node = Strategy::LocalSplit.build(
     ///     RateLimitConfig::per_second(6)?,
@@ -252,7 +252,7 @@ impl Strategy {
     /// }
     /// let allowed = out.decisions.iter().filter(|(_, d)| d.allowed).count();
     /// assert_eq!(allowed, 2); // this node's share of 6 across 3 nodes
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn build(
         &self,

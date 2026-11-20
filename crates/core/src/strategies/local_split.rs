@@ -10,8 +10,8 @@ use std::collections::HashMap;
 /// evenly; under-admits when one node gets more than its share.
 ///
 /// ```
-/// use drl_core::strategies::{CoordinationStrategy, LocalSplit, Outbox};
-/// use drl_core::{Cost, Nanos, RateLimitConfig};
+/// use ratelab::strategies::{CoordinationStrategy, LocalSplit, Outbox};
+/// use ratelab::{Cost, Nanos, RateLimitConfig};
 ///
 /// let mut node = LocalSplit::new(RateLimitConfig::per_second(10)?, 2);
 /// let mut out = Outbox::default();
@@ -20,7 +20,7 @@ use std::collections::HashMap;
 /// }
 /// assert_eq!(out.decisions.iter().filter(|(_, d)| d.allowed).count(), 5);
 /// assert!(out.messages.is_empty());
-/// # Ok::<(), drl_core::ConfigError>(())
+/// # Ok::<(), ratelab::ConfigError>(())
 /// ```
 #[derive(Debug)]
 pub struct LocalSplit {

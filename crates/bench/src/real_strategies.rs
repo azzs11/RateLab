@@ -10,8 +10,8 @@
 use crate::cluster::Sample;
 use crate::stats::Summary;
 use crate::strategies::NETWORK;
-use drl_core::strategies::Strategy;
-use drl_core::{Cost, Decision, FailurePolicy, Nanos, RateLimitConfig, Tokens};
+use ratelab::strategies::Strategy;
+use ratelab::{Cost, Decision, FailurePolicy, Nanos, RateLimitConfig, Tokens};
 use serde::{Deserialize, Serialize};
 use sim::Arrival;
 use sim::cluster::{ClusterArrival, ClusterConfig, ClusterRun, Outcome, run_cluster};

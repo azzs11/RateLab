@@ -7,8 +7,8 @@
 use crate::oracle::{ExactOracle, compare};
 use crate::strategies::NETWORK;
 use crate::traces::TraceInfo;
-use drl_core::strategies::Strategy;
-use drl_core::{Algorithm, FailurePolicy, ManualClock, RateLimitConfig};
+use ratelab::strategies::Strategy;
+use ratelab::{Algorithm, FailurePolicy, ManualClock, RateLimitConfig};
 use serde::{Deserialize, Serialize};
 use sim::Arrival;
 use sim::cluster::{ClusterConfig, place, run_cluster};
@@ -40,7 +40,7 @@ pub fn choose_limit(arrivals: &[Arrival], target: f64) -> u64 {
             .iter()
             .map(|&arrival| sim::Step {
                 arrival,
-                decision: drl_core::Decision::allow(drl_core::Tokens(0), Duration::ZERO),
+                decision: ratelab::Decision::allow(ratelab::Tokens(0), Duration::ZERO),
             })
             .collect(),
     };
@@ -174,7 +174,7 @@ pub fn replay(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use drl_core::{Cost, Nanos};
+    use ratelab::{Cost, Nanos};
 
     fn burst(at_secs: u64, key: u32, n: usize) -> Vec<Arrival> {
         vec![

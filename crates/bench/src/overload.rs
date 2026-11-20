@@ -17,8 +17,8 @@
 
 use crate::machine::Machine;
 use crate::stats::Summary;
-use drl_core::Nanos;
-use drl_core::concurrency::{AimdConfig, Concurrency, ConcurrencyLimiter, Gradient2Config};
+use ratelab::Nanos;
+use ratelab::concurrency::{AimdConfig, Concurrency, ConcurrencyLimiter, Gradient2Config};
 use serde::{Deserialize, Serialize};
 use server::capacity::{CapacityBackend, WORK_HEADER, work_router};
 use server::concurrency::{ConcurrencyLimitLayer, LIMIT_HEADER};

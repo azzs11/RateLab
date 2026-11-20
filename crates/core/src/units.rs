@@ -15,7 +15,7 @@ impl Nanos {
     /// Converts a duration since the clock origin into `Nanos`, saturating at `u64::MAX`.
     ///
     /// ```
-    /// use drl_core::Nanos;
+    /// use ratelab::Nanos;
     /// use std::time::Duration;
     ///
     /// assert_eq!(Nanos::from_duration(Duration::from_micros(3)), Nanos(3_000));
@@ -27,7 +27,7 @@ impl Nanos {
     /// This instant moved forward by `d`, saturating at `u64::MAX`.
     ///
     /// ```
-    /// use drl_core::Nanos;
+    /// use ratelab::Nanos;
     /// use std::time::Duration;
     ///
     /// assert_eq!(Nanos(5).saturating_add(Duration::from_nanos(2)), Nanos(7));
@@ -39,7 +39,7 @@ impl Nanos {
     /// Time elapsed since `earlier`, or zero if `earlier` is later than `self`.
     ///
     /// ```
-    /// use drl_core::Nanos;
+    /// use ratelab::Nanos;
     /// use std::time::Duration;
     ///
     /// assert_eq!(Nanos(10).saturating_since(Nanos(4)), Duration::from_nanos(6));

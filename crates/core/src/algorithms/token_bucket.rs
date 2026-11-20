@@ -20,7 +20,7 @@ struct Bucket {
 /// of refill).
 ///
 /// ```
-/// use drl_core::{Cost, ManualClock, RateLimitConfig, RateLimiter, TokenBucket};
+/// use ratelab::{Cost, ManualClock, RateLimitConfig, RateLimiter, TokenBucket};
 /// use std::time::Duration;
 ///
 /// let clock = ManualClock::new();
@@ -32,7 +32,7 @@ struct Bucket {
 ///
 /// clock.advance(Duration::from_millis(250)); // a quarter window refills one token
 /// assert!(limiter.check("k", Cost::ONE).allowed);
-/// # Ok::<(), drl_core::ConfigError>(())
+/// # Ok::<(), ratelab::ConfigError>(())
 /// ```
 #[derive(Debug)]
 pub struct TokenBucket<C> {

@@ -1,6 +1,6 @@
 [package]
 name = "sim"
-description = "Deterministic, seeded traffic simulation for drl-core limiters."
+description = "Deterministic, seeded traffic simulation for ratelab limiters."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,7 +10,7 @@ publish = false
 
 [dependencies]
 # No system clock needed: the simulator drives a ManualClock. Keeps the crate wasm-friendly.
-drl-core.workspace = true
+ratelab.workspace = true
 
 [lints]
 workspace = true

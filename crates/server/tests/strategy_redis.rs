@@ -1,8 +1,8 @@
 //! Coordination strategies against a real Redis: three nodes in one process sharing it.
 //! Needs Docker: `cargo test -p server -- --ignored` (CI runs it).
 
-use drl_core::{Cost, FailurePolicy, RateLimitConfig};
 use drl_redis_store::RedisRateLimiter;
+use ratelab::{Cost, FailurePolicy, RateLimitConfig};
 use server::strategy::{STRATEGIES, StrategyBackend};
 use std::sync::Arc;
 use std::time::Duration;

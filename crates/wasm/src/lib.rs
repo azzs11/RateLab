@@ -1,4 +1,4 @@
-//! WebAssembly bindings for `drl-core` and `sim`, used by the browser playground.
+//! WebAssembly bindings for `ratelab` and `sim`, used by the browser playground.
 //!
 //! - [`Limiter`]: one live limiter, time passed in from JavaScript;
 //! - [`traffic::Traffic`]: seeded traffic patterns, or arrays from a user's log;
@@ -34,7 +34,7 @@ pub mod replay;
 pub mod tokens;
 pub mod traffic;
 
-use drl_core::{Algorithm, Cost, ManualClock, Nanos, RateLimitConfig, RateLimiter};
+use ratelab::{Algorithm, Cost, ManualClock, Nanos, RateLimitConfig, RateLimiter};
 use std::sync::Arc;
 use std::time::Duration;
 use wasm_bindgen::prelude::*;
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn matches_the_native_library() {
-        // The wrapper must not change decisions: compare with drl-core directly.
+        // The wrapper must not change decisions: compare with ratelab directly.
         let wasm = Limiter::build("sliding_window", 3, 100.0).unwrap();
         let clock = Arc::new(ManualClock::new());
         let native = Algorithm::SlidingWindow.build(

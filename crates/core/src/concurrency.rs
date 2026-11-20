@@ -19,8 +19,8 @@
 //! Time is injected: callers pass the current time and the measured latency.
 //!
 //! ```
-//! use drl_core::concurrency::{Completion, Concurrency, ConcurrencyLimiter};
-//! use drl_core::Nanos;
+//! use ratelab::concurrency::{Completion, Concurrency, ConcurrencyLimiter};
+//! use ratelab::Nanos;
 //! use std::time::Duration;
 //!
 //! let limiter = ConcurrencyLimiter::new(Concurrency::Fixed(2));
@@ -67,7 +67,7 @@ impl FixedLimit {
     /// A limit of `limit` (at least 1).
     ///
     /// ```
-    /// use drl_core::concurrency::{FixedLimit, LimitAlgorithm};
+    /// use ratelab::concurrency::{FixedLimit, LimitAlgorithm};
     /// assert_eq!(FixedLimit::new(0).limit(), 1);
     /// ```
     pub fn new(limit: usize) -> Self {
@@ -118,8 +118,8 @@ impl Default for AimdConfig {
 /// It reacts only to drops, so latency can rise up to the threshold before it backs off.
 ///
 /// ```
-/// use drl_core::concurrency::{Aimd, AimdConfig, LimitAlgorithm, Sample};
-/// use drl_core::Nanos;
+/// use ratelab::concurrency::{Aimd, AimdConfig, LimitAlgorithm, Sample};
+/// use ratelab::Nanos;
 /// use std::time::Duration;
 ///
 /// let mut aimd = Aimd::new(AimdConfig { initial: 10, ..AimdConfig::default() });
@@ -139,7 +139,7 @@ impl Aimd {
     /// An AIMD limit with `config`.
     ///
     /// ```
-    /// use drl_core::concurrency::{Aimd, AimdConfig, LimitAlgorithm};
+    /// use ratelab::concurrency::{Aimd, AimdConfig, LimitAlgorithm};
     /// assert_eq!(Aimd::new(AimdConfig::default()).limit(), 20);
     /// ```
     pub fn new(config: AimdConfig) -> Self {
@@ -227,8 +227,8 @@ impl Default for Gradient2Config {
 /// of only timeouts still lowers the limit.
 ///
 /// ```
-/// use drl_core::concurrency::{Gradient2, Gradient2Config, LimitAlgorithm, Sample};
-/// use drl_core::Nanos;
+/// use ratelab::concurrency::{Gradient2, Gradient2Config, LimitAlgorithm, Sample};
+/// use ratelab::Nanos;
 /// use std::time::Duration;
 ///
 /// let mut g = Gradient2::new(Gradient2Config::default());
@@ -262,7 +262,7 @@ impl Gradient2 {
     /// A Gradient2 limit with `config`.
     ///
     /// ```
-    /// use drl_core::concurrency::{Gradient2, Gradient2Config, LimitAlgorithm};
+    /// use ratelab::concurrency::{Gradient2, Gradient2Config, LimitAlgorithm};
     /// assert_eq!(Gradient2::new(Gradient2Config::default()).limit(), 20);
     /// ```
     pub fn new(config: Gradient2Config) -> Self {
@@ -291,7 +291,7 @@ impl Gradient2 {
     /// The long-term latency, seconds (0 before the first window).
     ///
     /// ```
-    /// use drl_core::concurrency::{Gradient2, Gradient2Config};
+    /// use ratelab::concurrency::{Gradient2, Gradient2Config};
     /// assert_eq!(Gradient2::new(Gradient2Config::default()).long_rtt(), 0.0);
     /// ```
     pub fn long_rtt(&self) -> f64 {
@@ -371,7 +371,7 @@ impl Concurrency {
     /// Short name: `fixed`, `aimd` or `gradient2`.
     ///
     /// ```
-    /// use drl_core::concurrency::Concurrency;
+    /// use ratelab::concurrency::Concurrency;
     /// assert_eq!(Concurrency::Fixed(8).name(), "fixed");
     /// ```
     pub fn name(&self) -> &'static str {
@@ -385,7 +385,7 @@ impl Concurrency {
     /// A fresh algorithm with these settings.
     ///
     /// ```
-    /// use drl_core::concurrency::Concurrency;
+    /// use ratelab::concurrency::Concurrency;
     /// assert_eq!(Concurrency::Fixed(8).build().limit(), 8);
     /// ```
     pub fn build(&self) -> Box<dyn LimitAlgorithm> {
@@ -420,8 +420,8 @@ impl Ticket {
     /// Requests in flight when this one was admitted, itself included.
     ///
     /// ```
-    /// use drl_core::concurrency::{Completion, Concurrency, ConcurrencyLimiter};
-    /// use drl_core::Nanos;
+    /// use ratelab::concurrency::{Completion, Concurrency, ConcurrencyLimiter};
+    /// use ratelab::Nanos;
     /// use std::time::Duration;
     ///
     /// let limiter = ConcurrencyLimiter::new(Concurrency::Fixed(4));
@@ -451,7 +451,7 @@ impl ConcurrencyLimiter {
     /// A limiter using `concurrency`.
     ///
     /// ```
-    /// use drl_core::concurrency::{Concurrency, ConcurrencyLimiter, Gradient2Config};
+    /// use ratelab::concurrency::{Concurrency, ConcurrencyLimiter, Gradient2Config};
     /// let limiter = ConcurrencyLimiter::new(Concurrency::Gradient2(Gradient2Config::default()));
     /// assert_eq!(limiter.limit(), 20);
     /// ```
@@ -462,7 +462,7 @@ impl ConcurrencyLimiter {
     /// A limiter using any [`LimitAlgorithm`].
     ///
     /// ```
-    /// use drl_core::concurrency::{ConcurrencyLimiter, FixedLimit};
+    /// use ratelab::concurrency::{ConcurrencyLimiter, FixedLimit};
     /// let limiter = ConcurrencyLimiter::with_algorithm(Box::new(FixedLimit::new(3)));
     /// assert_eq!(limiter.limit(), 3);
     /// ```
@@ -482,7 +482,7 @@ impl ConcurrencyLimiter {
     /// Admits a request if fewer than the limit are in flight; `None` means shed it.
     ///
     /// ```
-    /// use drl_core::concurrency::{Concurrency, ConcurrencyLimiter};
+    /// use ratelab::concurrency::{Concurrency, ConcurrencyLimiter};
     /// let limiter = ConcurrencyLimiter::new(Concurrency::Fixed(1));
     /// let _held = limiter.try_acquire().unwrap();
     /// assert!(limiter.try_acquire().is_none());
@@ -501,8 +501,8 @@ impl ConcurrencyLimiter {
     /// Frees the slot of a finished request and lets the algorithm learn from it.
     ///
     /// ```
-    /// use drl_core::concurrency::{AimdConfig, Completion, Concurrency, ConcurrencyLimiter};
-    /// use drl_core::Nanos;
+    /// use ratelab::concurrency::{AimdConfig, Completion, Concurrency, ConcurrencyLimiter};
+    /// use ratelab::Nanos;
     /// use std::time::Duration;
     ///
     /// let limiter = ConcurrencyLimiter::new(Concurrency::Aimd(AimdConfig {
@@ -533,7 +533,7 @@ impl ConcurrencyLimiter {
     /// The current limit.
     ///
     /// ```
-    /// use drl_core::concurrency::{Concurrency, ConcurrencyLimiter};
+    /// use ratelab::concurrency::{Concurrency, ConcurrencyLimiter};
     /// assert_eq!(ConcurrencyLimiter::new(Concurrency::Fixed(5)).limit(), 5);
     /// ```
     pub fn limit(&self) -> usize {
@@ -543,7 +543,7 @@ impl ConcurrencyLimiter {
     /// Requests in flight now.
     ///
     /// ```
-    /// use drl_core::concurrency::{Concurrency, ConcurrencyLimiter};
+    /// use ratelab::concurrency::{Concurrency, ConcurrencyLimiter};
     /// assert_eq!(ConcurrencyLimiter::new(Concurrency::Fixed(5)).inflight(), 0);
     /// ```
     pub fn inflight(&self) -> usize {

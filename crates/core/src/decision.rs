@@ -24,7 +24,7 @@ impl Decision {
     /// An admitted request.
     ///
     /// ```
-    /// use drl_core::{Decision, Tokens};
+    /// use ratelab::{Decision, Tokens};
     /// use std::time::Duration;
     ///
     /// let d = Decision::allow(Tokens(4), Duration::from_secs(1));
@@ -43,7 +43,7 @@ impl Decision {
     /// A rejected request.
     ///
     /// ```
-    /// use drl_core::{Decision, Tokens};
+    /// use ratelab::{Decision, Tokens};
     /// use std::time::Duration;
     ///
     /// let d = Decision::deny(Tokens(0), Duration::from_secs(1), Some(Duration::from_millis(200)));

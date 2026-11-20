@@ -20,9 +20,9 @@ use axum::body::{Body, Bytes};
 use axum::extract::State;
 use axum::http::{HeaderName, HeaderValue, Request, Response, StatusCode, header};
 use axum::routing::post;
-use drl_core::Clock;
-use drl_core::tokens::{TokenLimiter, TokenRequest, TokenTicket};
 use futures_util::StreamExt;
+use ratelab::Clock;
+use ratelab::tokens::{TokenLimiter, TokenRequest, TokenTicket};
 use serde::Deserialize;
 use std::convert::Infallible;
 use std::future::Future;
@@ -300,8 +300,8 @@ async fn complete(State(model): State<MockModel>, body: Bytes) -> Response<Body>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use drl_core::tokens::{Accounting, ModelPolicy, TokenPolicy};
-    use drl_core::{ManualClock, RateLimitConfig};
+    use ratelab::tokens::{Accounting, ModelPolicy, TokenPolicy};
+    use ratelab::{ManualClock, RateLimitConfig};
     use tower::ServiceExt;
 
     fn app(accounting: Accounting) -> (Router, Arc<TokenLimiter<Arc<ManualClock>>>) {

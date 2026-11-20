@@ -266,8 +266,8 @@ dependencies = [
  "cap",
  "clap",
  "criterion",
- "drl-core",
  "flate2",
+ "ratelab",
  "redis",
  "reqwest",
  "serde",
@@ -733,18 +733,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "drl-core"
-version = "0.6.0"
-dependencies = [
- "dashmap",
- "thiserror",
-]
-
-[[package]]
 name = "drl-redis-store"
 version = "0.6.0"
 dependencies = [
- "drl-core",
+ "ratelab",
  "redis",
  "testcontainers-modules",
  "thiserror",
@@ -2137,6 +2129,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ratelab"
+version = "0.6.0"
+dependencies = [
+ "dashmap",
+ "thiserror",
+]
+
+[[package]]
 name = "raw-cpuid"
 version = "11.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2566,11 +2566,11 @@ dependencies = [
  "anyhow",
  "axum",
  "clap",
- "drl-core",
  "drl-redis-store",
  "futures-util",
  "metrics",
  "metrics-exporter-prometheus",
+ "ratelab",
  "redis",
  "serde",
  "serde_json",
@@ -2628,7 +2628,7 @@ dependencies = [
 name = "sim"
 version = "0.6.0"
 dependencies = [
- "drl-core",
+ "ratelab",
 ]
 
 [[package]]
@@ -3253,7 +3253,7 @@ dependencies = [
 name = "wasm"
 version = "0.6.0"
 dependencies = [
- "drl-core",
+ "ratelab",
  "sim",
  "wasm-bindgen",
 ]

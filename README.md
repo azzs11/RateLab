@@ -34,7 +34,7 @@ its own accuracy**. See [docs/ROADMAP.md](docs/ROADMAP.md) for the plan.
 
 ## Features
 
-### Algorithms (in-process, `drl-core`)
+### Algorithms (in-process, `ratelab`)
 
 | Algorithm | How it works | Trade-off |
 |-----------|--------------|-----------|
@@ -71,11 +71,11 @@ to the same Redis enforces one shared limit.
 - **Exact integers:** token amounts are scaled by the window in microseconds and
   kept below 2^53, so Lua's doubles never round.
 - **Circuit breaker:** `GuardedLimiter` wraps the store in a closed / open /
-  half-open breaker (`drl_core::CircuitBreaker`). While Redis is down, each
+  half-open breaker (`ratelab::CircuitBreaker`). While Redis is down, each
   call's `FailurePolicy` decides: **fail open** (allow) or **fail closed** (deny).
 - **Tested against a real Redis** started by testcontainers, including an outage.
 
-### Coordination strategies (`drl_core::strategies`)
+### Coordination strategies (`ratelab::strategies`)
 
 How N nodes enforce **one** limit together. Each strategy is a state machine with no
 I/O: it receives requests, store replies and timer ticks, and returns decisions and
@@ -124,7 +124,7 @@ too early. `/metrics` exports Prometheus counters and a decision-time histogram
 #### Token limits for LLM traffic
 
 An LLM request costs its prompt tokens, known on arrival, and its answer's tokens,
-known only when the answer has finished streaming. `drl_core::tokens` keeps an input
+known only when the answer has finished streaming. `ratelab::tokens` keeps an input
 and an output budget per tenant, charges tokens times a per-model weight (so a large
 model can cost more per token), and offers three ways to charge for the answer:
 
@@ -162,7 +162,7 @@ cargo run -p server --bin web-server -- --concurrency gradient2   # or aimd, fix
 
 The layer sits outside the rate limit (a shed request spends no quota) and reports the
 current limit in `x-drl-concurrency-limit`. Both algorithms follow Netflix's
-`concurrency-limits` library and live in `drl_core::concurrency`, with no I/O.
+`concurrency-limits` library and live in `ratelab::concurrency`, with no I/O.
 
 ### Other
 
@@ -176,7 +176,7 @@ current limit in `x-drl-concurrency-limit`. Both algorithms follow Netflix's
 
 | Crate | What it holds |
 |-------|---------------|
-| `crates/core` (`drl-core`) | Algorithms, coordination strategies, `Clock`, `Decision`, circuit breaker, unit newtypes. No I/O. |
+| `crates/core` (`ratelab`) | Algorithms, coordination strategies, `Clock`, `Decision`, circuit breaker, unit newtypes. No I/O. |
 | `crates/redis-store` (`drl-redis-store`) | Redis token bucket (Lua, EVALSHA, Redis `TIME`) and `GuardedLimiter` |
 | `crates/server` | Axum server with the Tower layer (`web-server`, serves the built playground), demo binary (`demo`) |
 | `crates/sim` | Deterministic traffic scenarios and the multi-node cluster simulator |
@@ -254,7 +254,7 @@ cargo run -p server --bin web-server  # API on http://localhost:3001
 ### Basic usage
 
 ```rust
-use drl_core::{Cost, RateLimitConfig, RateLimiter, TokenBucket};
+use ratelab::{Cost, RateLimitConfig, RateLimiter, TokenBucket};
 
 // 100 requests per second
 let config = RateLimitConfig::per_second(100)?;
@@ -274,7 +274,7 @@ Pick an algorithm at runtime with `"gcra".parse::<Algorithm>()?.build(config, cl
 ### Testing with a manual clock
 
 ```rust
-use drl_core::{Cost, Gcra, ManualClock, RateLimitConfig, RateLimiter};
+use ratelab::{Cost, Gcra, ManualClock, RateLimitConfig, RateLimiter};
 
 let clock = ManualClock::new();
 let limiter = Gcra::with_clock(RateLimitConfig::per_second(2)?, &clock);
@@ -290,7 +290,7 @@ assert!(limiter.check("k", Cost::ONE).allowed);
 ### Shared through Redis
 
 ```rust
-use drl_core::{BreakerConfig, CircuitBreaker, Cost, FailurePolicy, MonotonicClock, RateLimitConfig};
+use ratelab::{BreakerConfig, CircuitBreaker, Cost, FailurePolicy, MonotonicClock, RateLimitConfig};
 use drl_redis_store::{GuardedLimiter, RedisRateLimiter};
 use std::time::Duration;
 

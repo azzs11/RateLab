@@ -9,7 +9,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
-drl-core = { workspace = true, features = ["std-clock"] }
+ratelab = { workspace = true, features = ["std-clock"] }
 drl-redis-store.workspace = true
 anyhow = "1.0"
 axum = "0.8"

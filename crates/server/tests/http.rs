@@ -4,7 +4,7 @@ use axum::Router;
 use axum::body::{Body, to_bytes};
 use axum::extract::ConnectInfo;
 use axum::http::{Request, StatusCode};
-use drl_core::{Algorithm, ManualClock, RateLimitConfig};
+use ratelab::{Algorithm, ManualClock, RateLimitConfig};
 use server::app;
 use server::backend::Backend;
 use server::layer::{Limits, caller_key};
@@ -186,7 +186,7 @@ fn caller_key_prefers_api_key_then_peer_ip() {
 
 #[tokio::test]
 async fn the_concurrency_limit_applies_to_the_api_routes_only() {
-    use drl_core::concurrency::{Concurrency, ConcurrencyLimiter};
+    use ratelab::concurrency::{Concurrency, ConcurrencyLimiter};
     let clock = Arc::new(ManualClock::new());
     let config = RateLimitConfig::per_minute(3).unwrap();
     let limits = Arc::new(Limits {

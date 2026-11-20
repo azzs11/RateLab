@@ -2,10 +2,8 @@
 //! a coordination strategy running against Redis.
 
 use crate::strategy::StrategyBackend;
-use drl_core::{
-    Clock, Cost, Decision, FailurePolicy, MonotonicClock, RateLimitConfig, RateLimiter,
-};
 use drl_redis_store::{GuardedLimiter, Source};
+use ratelab::{Clock, Cost, Decision, FailurePolicy, MonotonicClock, RateLimitConfig, RateLimiter};
 use std::sync::Arc;
 
 /// Who made a decision.

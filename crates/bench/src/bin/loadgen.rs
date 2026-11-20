@@ -14,7 +14,7 @@ use bench::machine::Machine;
 use bench::results::{SCHEMA, write_json};
 use bench::stats::Summary;
 use clap::Parser;
-use drl_core::RateLimitConfig;
+use ratelab::RateLimitConfig;
 use sim::SplitMix64;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -552,7 +552,7 @@ async fn strategies_mode(
     config: RateLimitConfig,
 ) -> anyhow::Result<()> {
     use bench::real_strategies::{self, RealStrategyResults};
-    use drl_core::strategies::Strategy;
+    use ratelab::strategies::Strategy;
     let seeds = if args.quick { 1 } else { 3 };
     let nodes = targets.len();
     let mut rows = Vec::new();

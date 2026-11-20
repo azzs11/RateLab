@@ -1,6 +1,6 @@
 //! Traffic for the playground: seeded patterns, or arrays from a user's log.
 
-use drl_core::{Cost, Nanos, RateLimitConfig};
+use ratelab::{Cost, Nanos, RateLimitConfig};
 use sim::Arrival;
 use std::time::Duration;
 use wasm_bindgen::prelude::*;

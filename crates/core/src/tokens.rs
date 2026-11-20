@@ -25,8 +25,8 @@
 //! [`Clock`], as everywhere in this crate, and all arithmetic is exact integers.
 //!
 //! ```
-//! use drl_core::tokens::{Accounting, ModelPolicy, TokenLimiter, TokenPolicy, TokenRequest};
-//! use drl_core::{ManualClock, RateLimitConfig};
+//! use ratelab::tokens::{Accounting, ModelPolicy, TokenLimiter, TokenPolicy, TokenRequest};
+//! use ratelab::{ManualClock, RateLimitConfig};
 //!
 //! // 1,000 input and 500 output units per minute per tenant; one model at weight 1.
 //! let policy = TokenPolicy::new(
@@ -77,7 +77,7 @@ impl Accounting {
     /// Short name: `estimate_only`, `reserve_max` or `admit_then_reconcile`.
     ///
     /// ```
-    /// use drl_core::tokens::Accounting;
+    /// use ratelab::tokens::Accounting;
     /// assert_eq!(Accounting::ReserveMax.name(), "reserve_max");
     /// assert_eq!("admit_then_reconcile".parse::<Accounting>(), Ok(Accounting::AdmitThenReconcile));
     /// ```
@@ -129,7 +129,7 @@ impl ModelPolicy {
     /// A model with these weights, maximum and starting estimate.
     ///
     /// ```
-    /// use drl_core::tokens::ModelPolicy;
+    /// use ratelab::tokens::ModelPolicy;
     /// let large = ModelPolicy::new(3, 6, 4_096, 300);
     /// assert_eq!(large.output_weight, 6);
     /// ```
@@ -161,15 +161,15 @@ impl TokenPolicy {
     /// Per-tenant input and output budgets, in weighted units per window.
     ///
     /// ```
-    /// use drl_core::tokens::{Accounting, TokenPolicy};
-    /// use drl_core::RateLimitConfig;
+    /// use ratelab::tokens::{Accounting, TokenPolicy};
+    /// use ratelab::RateLimitConfig;
     /// let p = TokenPolicy::new(
     ///     RateLimitConfig::per_minute(10_000)?,
     ///     RateLimitConfig::per_minute(2_000)?,
     ///     Accounting::ReserveMax,
     /// );
     /// assert_eq!(p.accounting(), Accounting::ReserveMax);
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn new(input: RateLimitConfig, output: RateLimitConfig, accounting: Accounting) -> Self {
         Self {
@@ -183,12 +183,12 @@ impl TokenPolicy {
     /// Adds (or replaces) a model.
     ///
     /// ```
-    /// use drl_core::tokens::{Accounting, ModelPolicy, TokenPolicy};
-    /// use drl_core::RateLimitConfig;
+    /// use ratelab::tokens::{Accounting, ModelPolicy, TokenPolicy};
+    /// use ratelab::RateLimitConfig;
     /// let p = TokenPolicy::new(RateLimitConfig::per_minute(100)?, RateLimitConfig::per_minute(100)?, Accounting::EstimateOnly)
     ///     .model("small", ModelPolicy::new(1, 1, 256, 64));
     /// assert!(p.model_policy("small").is_some());
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn model(mut self, name: impl Into<String>, policy: ModelPolicy) -> Self {
         self.models.insert(name.into(), policy);
@@ -198,11 +198,11 @@ impl TokenPolicy {
     /// The same policy with another accounting mode.
     ///
     /// ```
-    /// # use drl_core::tokens::{Accounting, TokenPolicy};
-    /// # use drl_core::RateLimitConfig;
+    /// # use ratelab::tokens::{Accounting, TokenPolicy};
+    /// # use ratelab::RateLimitConfig;
     /// let p = TokenPolicy::new(RateLimitConfig::per_minute(1)?, RateLimitConfig::per_minute(1)?, Accounting::EstimateOnly);
     /// assert_eq!(p.with_accounting(Accounting::ReserveMax).accounting(), Accounting::ReserveMax);
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn with_accounting(mut self, accounting: Accounting) -> Self {
         self.accounting = accounting;
@@ -212,11 +212,11 @@ impl TokenPolicy {
     /// The accounting mode.
     ///
     /// ```
-    /// # use drl_core::tokens::{Accounting, TokenPolicy};
-    /// # use drl_core::RateLimitConfig;
+    /// # use ratelab::tokens::{Accounting, TokenPolicy};
+    /// # use ratelab::RateLimitConfig;
     /// # let p = TokenPolicy::new(RateLimitConfig::per_minute(1)?, RateLimitConfig::per_minute(1)?, Accounting::EstimateOnly);
     /// assert_eq!(p.accounting(), Accounting::EstimateOnly);
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn accounting(&self) -> Accounting {
         self.accounting
@@ -225,11 +225,11 @@ impl TokenPolicy {
     /// The input budget.
     ///
     /// ```
-    /// # use drl_core::tokens::{Accounting, TokenPolicy};
-    /// # use drl_core::RateLimitConfig;
+    /// # use ratelab::tokens::{Accounting, TokenPolicy};
+    /// # use ratelab::RateLimitConfig;
     /// # let p = TokenPolicy::new(RateLimitConfig::per_minute(7)?, RateLimitConfig::per_minute(1)?, Accounting::EstimateOnly);
     /// assert_eq!(p.input().limit(), 7);
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn input(&self) -> RateLimitConfig {
         self.input
@@ -238,11 +238,11 @@ impl TokenPolicy {
     /// The output budget.
     ///
     /// ```
-    /// # use drl_core::tokens::{Accounting, TokenPolicy};
-    /// # use drl_core::RateLimitConfig;
+    /// # use ratelab::tokens::{Accounting, TokenPolicy};
+    /// # use ratelab::RateLimitConfig;
     /// # let p = TokenPolicy::new(RateLimitConfig::per_minute(7)?, RateLimitConfig::per_minute(9)?, Accounting::EstimateOnly);
     /// assert_eq!(p.output().limit(), 9);
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn output(&self) -> RateLimitConfig {
         self.output
@@ -251,11 +251,11 @@ impl TokenPolicy {
     /// A model's policy.
     ///
     /// ```
-    /// # use drl_core::tokens::{Accounting, TokenPolicy};
-    /// # use drl_core::RateLimitConfig;
+    /// # use ratelab::tokens::{Accounting, TokenPolicy};
+    /// # use ratelab::RateLimitConfig;
     /// # let p = TokenPolicy::new(RateLimitConfig::per_minute(7)?, RateLimitConfig::per_minute(9)?, Accounting::EstimateOnly);
     /// assert!(p.model_policy("nope").is_none());
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn model_policy(&self, name: &str) -> Option<&ModelPolicy> {
         self.models.get(name)
@@ -264,12 +264,12 @@ impl TokenPolicy {
     /// Model names, sorted.
     ///
     /// ```
-    /// # use drl_core::tokens::{Accounting, ModelPolicy, TokenPolicy};
-    /// # use drl_core::RateLimitConfig;
+    /// # use ratelab::tokens::{Accounting, ModelPolicy, TokenPolicy};
+    /// # use ratelab::RateLimitConfig;
     /// # let p = TokenPolicy::new(RateLimitConfig::per_minute(7)?, RateLimitConfig::per_minute(9)?, Accounting::EstimateOnly)
     /// #     .model("b", ModelPolicy::new(1, 1, 10, 5)).model("a", ModelPolicy::new(1, 1, 10, 5));
     /// assert_eq!(p.models().collect::<Vec<_>>(), ["a", "b"]);
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn models(&self) -> impl Iterator<Item = &str> {
         self.models.keys().map(String::as_str)
@@ -293,7 +293,7 @@ impl<'a> TokenRequest<'a> {
     /// A request with the model's default maximum output.
     ///
     /// ```
-    /// use drl_core::tokens::TokenRequest;
+    /// use ratelab::tokens::TokenRequest;
     /// let r = TokenRequest::new("alice", "small", 120).max_output(64);
     /// assert_eq!(r.max_output, Some(64));
     /// ```
@@ -309,7 +309,7 @@ impl<'a> TokenRequest<'a> {
     /// Sets `max_tokens`.
     ///
     /// ```
-    /// # use drl_core::tokens::TokenRequest;
+    /// # use ratelab::tokens::TokenRequest;
     /// assert_eq!(TokenRequest::new("a", "m", 1).max_output(5).max_output, Some(5));
     /// ```
     pub fn max_output(mut self, max_output: u64) -> Self {
@@ -333,8 +333,8 @@ impl TokenTicket {
     /// Output units charged at admission.
     ///
     /// ```
-    /// # use drl_core::tokens::*;
-    /// # use drl_core::{ManualClock, RateLimitConfig};
+    /// # use ratelab::tokens::*;
+    /// # use ratelab::{ManualClock, RateLimitConfig};
     /// # let p = TokenPolicy::new(RateLimitConfig::per_minute(1_000)?, RateLimitConfig::per_minute(1_000)?, Accounting::ReserveMax)
     /// #     .model("m", ModelPolicy::new(1, 2, 100, 10));
     /// # let clock = ManualClock::new();
@@ -351,8 +351,8 @@ impl TokenTicket {
     /// The most output tokens this request may produce.
     ///
     /// ```
-    /// # use drl_core::tokens::*;
-    /// # use drl_core::{ManualClock, RateLimitConfig};
+    /// # use ratelab::tokens::*;
+    /// # use ratelab::{ManualClock, RateLimitConfig};
     /// # let p = TokenPolicy::new(RateLimitConfig::per_minute(1_000)?, RateLimitConfig::per_minute(1_000)?, Accounting::ReserveMax)
     /// #     .model("m", ModelPolicy::new(1, 1, 100, 10));
     /// # let clock = ManualClock::new();
@@ -485,13 +485,13 @@ impl<C: Clock> TokenLimiter<C> {
     /// A limiter enforcing `policy` with time from `clock`.
     ///
     /// ```
-    /// # use drl_core::tokens::*;
-    /// # use drl_core::{ManualClock, RateLimitConfig};
+    /// # use ratelab::tokens::*;
+    /// # use ratelab::{ManualClock, RateLimitConfig};
     /// let p = TokenPolicy::new(RateLimitConfig::per_minute(10)?, RateLimitConfig::per_minute(10)?, Accounting::EstimateOnly);
     /// let clock = ManualClock::new();
     /// let l = TokenLimiter::new(p, &clock);
     /// assert_eq!(l.policy().accounting(), Accounting::EstimateOnly);
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn new(policy: TokenPolicy, clock: C) -> Self {
         let estimates = policy
@@ -512,13 +512,13 @@ impl<C: Clock> TokenLimiter<C> {
     /// The policy.
     ///
     /// ```
-    /// # use drl_core::tokens::*;
-    /// # use drl_core::{ManualClock, RateLimitConfig};
+    /// # use ratelab::tokens::*;
+    /// # use ratelab::{ManualClock, RateLimitConfig};
     /// # let p = TokenPolicy::new(RateLimitConfig::per_minute(10)?, RateLimitConfig::per_minute(20)?, Accounting::EstimateOnly);
     /// # let clock = ManualClock::new();
     /// let l = TokenLimiter::new(p, &clock);
     /// assert_eq!(l.policy().output().limit(), 20);
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn policy(&self) -> &TokenPolicy {
         &self.policy
@@ -527,14 +527,14 @@ impl<C: Clock> TokenLimiter<C> {
     /// The current output estimate for `model`, in tokens (0 for an unknown model).
     ///
     /// ```
-    /// # use drl_core::tokens::*;
-    /// # use drl_core::{ManualClock, RateLimitConfig};
+    /// # use ratelab::tokens::*;
+    /// # use ratelab::{ManualClock, RateLimitConfig};
     /// # let p = TokenPolicy::new(RateLimitConfig::per_minute(10)?, RateLimitConfig::per_minute(20)?, Accounting::EstimateOnly)
     /// #     .model("m", ModelPolicy::new(1, 1, 500, 80));
     /// # let clock = ManualClock::new();
     /// let l = TokenLimiter::new(p, &clock);
     /// assert_eq!(l.estimate("m"), 80);
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn estimate(&self, model: &str) -> u64 {
         let e = self
@@ -549,8 +549,8 @@ impl<C: Clock> TokenLimiter<C> {
     /// [`Accounting`] calls for.
     ///
     /// ```
-    /// # use drl_core::tokens::*;
-    /// # use drl_core::{ManualClock, RateLimitConfig};
+    /// # use ratelab::tokens::*;
+    /// # use ratelab::{ManualClock, RateLimitConfig};
     /// let p = TokenPolicy::new(RateLimitConfig::per_minute(100)?, RateLimitConfig::per_minute(100)?, Accounting::ReserveMax)
     ///     .model("m", ModelPolicy::new(1, 1, 60, 10));
     /// let clock = ManualClock::new();
@@ -635,8 +635,8 @@ impl<C: Clock> TokenLimiter<C> {
     /// charged, negative means a refund.
     ///
     /// ```
-    /// # use drl_core::tokens::*;
-    /// # use drl_core::{ManualClock, RateLimitConfig};
+    /// # use ratelab::tokens::*;
+    /// # use ratelab::{ManualClock, RateLimitConfig};
     /// let p = TokenPolicy::new(RateLimitConfig::per_minute(1_000)?, RateLimitConfig::per_minute(100)?, Accounting::AdmitThenReconcile)
     ///     .model("m", ModelPolicy::new(1, 1, 500, 50));
     /// let clock = ManualClock::new();
@@ -688,13 +688,13 @@ impl<C: Clock> TokenLimiter<C> {
     /// A tenant's balances now (a full budget for a tenant never seen).
     ///
     /// ```
-    /// # use drl_core::tokens::*;
-    /// # use drl_core::{ManualClock, RateLimitConfig};
+    /// # use ratelab::tokens::*;
+    /// # use ratelab::{ManualClock, RateLimitConfig};
     /// # let p = TokenPolicy::new(RateLimitConfig::per_minute(10)?, RateLimitConfig::per_minute(20)?, Accounting::EstimateOnly);
     /// # let clock = ManualClock::new();
     /// let l = TokenLimiter::new(p, &clock);
     /// assert_eq!(l.balance("new"), TokenBalance { input: 10, output: 20 });
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn balance(&self, tenant: &str) -> TokenBalance {
         let now = self.clock.now();

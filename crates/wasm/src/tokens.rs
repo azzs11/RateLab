@@ -2,10 +2,10 @@
 //! drive request by request) and [`TokenView`] (an hour of synthetic traffic through
 //! every accounting mode and the oracle, from [`sim::tokens`]).
 
-use drl_core::tokens::{
+use ratelab::tokens::{
     Accounting, ModelPolicy, TokenLimiter, TokenPolicy, TokenRequest, TokenTicket,
 };
-use drl_core::{ManualClock, RateLimitConfig};
+use ratelab::{ManualClock, RateLimitConfig};
 use sim::tokens::{
     Streaming, SynthModel, measure, oracle_requests, run, synthetic, wrongly_blocked_pct,
 };
@@ -53,7 +53,7 @@ impl TokenDemo {
     ) -> Result<TokenDemo, JsError> {
         let a: Accounting = accounting
             .parse()
-            .map_err(|e: drl_core::tokens::TokenError| JsError::new(&e.to_string()))?;
+            .map_err(|e: ratelab::tokens::TokenError| JsError::new(&e.to_string()))?;
         let p = policy(
             a,
             u64::from(output_per_min),

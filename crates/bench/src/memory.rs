@@ -1,6 +1,6 @@
 //! Bytes per key, measured by a counting global allocator in the `memory` binary.
 
-use drl_core::{Algorithm, Cost, ManualClock, RateLimitConfig};
+use ratelab::{Algorithm, Cost, ManualClock, RateLimitConfig};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;

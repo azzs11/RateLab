@@ -1,5 +1,5 @@
-use drl_core::{Algorithm, Cost, MonotonicClock, RateLimitConfig, RateLimiter};
 use drl_redis_store::RedisRateLimiter;
+use ratelab::{Algorithm, Cost, MonotonicClock, RateLimitConfig, RateLimiter};
 use server::metrics::Stats;
 use std::sync::LazyLock;
 use std::time::Duration;

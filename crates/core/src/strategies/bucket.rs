@@ -24,13 +24,13 @@ impl ShareBucket {
     /// of the limit, starting at `now`. `share` of 0 is treated as 1.
     ///
     /// ```
-    /// use drl_core::strategies::ShareBucket;
-    /// use drl_core::{Nanos, RateLimitConfig};
+    /// use ratelab::strategies::ShareBucket;
+    /// use ratelab::{Nanos, RateLimitConfig};
     ///
     /// let config = RateLimitConfig::per_second(10)?;
     /// let mut third = ShareBucket::new(config, 3, Nanos::ZERO);
     /// assert_eq!(third.tokens(), 3); // 10 / 3 = 3.33 tokens
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn new(config: RateLimitConfig, share: u64, now: Nanos) -> Self {
         Self::with_shares(config, share, share, now)
@@ -40,8 +40,8 @@ impl ShareBucket {
     /// `limit / rate_share` per window. Shares of 0 are treated as 1.
     ///
     /// ```
-    /// use drl_core::strategies::ShareBucket;
-    /// use drl_core::{Nanos, RateLimitConfig};
+    /// use ratelab::strategies::ShareBucket;
+    /// use ratelab::{Nanos, RateLimitConfig};
     ///
     /// // Can hold the whole limit, but refills at a third of the rate.
     /// let config = RateLimitConfig::per_second(9)?;
@@ -49,7 +49,7 @@ impl ShareBucket {
     /// assert_eq!(b.take_up_to(100), 9);
     /// b.refill(Nanos(1_000_000_000));
     /// assert_eq!(b.tokens(), 3);
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn with_shares(
         config: RateLimitConfig,
@@ -85,8 +85,8 @@ impl ShareBucket {
     /// skewed callers, every jump forward refills again.
     ///
     /// ```
-    /// use drl_core::strategies::ShareBucket;
-    /// use drl_core::{Nanos, RateLimitConfig};
+    /// use ratelab::strategies::ShareBucket;
+    /// use ratelab::{Nanos, RateLimitConfig};
     ///
     /// let config = RateLimitConfig::per_second(10)?;
     /// let mut b = ShareBucket::new(config, 1, Nanos(1_000_000_000));
@@ -98,7 +98,7 @@ impl ShareBucket {
     ///     b.refill_trusting(Nanos(1_000_000_000));
     /// }
     /// assert_eq!(b.tokens(), 3);
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn refill_trusting(&mut self, now: Nanos) {
         self.refill(now);

@@ -13,7 +13,7 @@
 //! The draft counts in whole seconds, so sub-second values are rounded **up**: a client
 //! that waits `t` or `Retry-After` seconds never retries too early.
 
-use drl_core::{Decision, RateLimitConfig};
+use ratelab::{Decision, RateLimitConfig};
 use std::time::Duration;
 
 /// Whole seconds, rounded up.
@@ -24,7 +24,7 @@ pub fn ceil_secs(d: Duration) -> u64 {
 /// `RateLimit-Policy` value for `policy` with `config`.
 ///
 /// ```
-/// use drl_core::RateLimitConfig;
+/// use ratelab::RateLimitConfig;
 /// use server::headers::policy_header;
 ///
 /// let config = RateLimitConfig::per_minute(100).unwrap();
@@ -41,7 +41,7 @@ pub fn policy_header(policy: &str, config: RateLimitConfig) -> String {
 /// `RateLimit` value for `policy` after `decision`.
 ///
 /// ```
-/// use drl_core::{Decision, Tokens};
+/// use ratelab::{Decision, Tokens};
 /// use server::headers::ratelimit_header;
 /// use std::time::Duration;
 ///
@@ -60,7 +60,7 @@ pub fn ratelimit_header(policy: &str, decision: &Decision) -> String {
 /// request can never succeed (cost above the limit).
 ///
 /// ```
-/// use drl_core::{Decision, Tokens};
+/// use ratelab::{Decision, Tokens};
 /// use server::headers::retry_after_header;
 /// use std::time::Duration;
 ///
@@ -74,7 +74,7 @@ pub fn retry_after_header(decision: &Decision) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use drl_core::Tokens;
+    use ratelab::Tokens;
 
     #[test]
     fn rounds_up_never_down() {

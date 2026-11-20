@@ -1,4 +1,4 @@
-//! Deterministic traffic simulation for `drl-core` limiters.
+//! Deterministic traffic simulation for `ratelab` limiters.
 //!
 //! Generate a list of [`Arrival`]s from a seed, replay them through any
 //! [`RateLimiter`] on a [`ManualClock`], and measure the resulting [`Trace`]. The same
@@ -10,7 +10,7 @@
 //! outages.
 //!
 //! ```
-//! use drl_core::{Algorithm, ManualClock, RateLimitConfig};
+//! use ratelab::{Algorithm, ManualClock, RateLimitConfig};
 //! use sim::{boundary_attack, run};
 //! use std::sync::Arc;
 //! use std::time::Duration;
@@ -27,14 +27,14 @@
 //! let sliding = Algorithm::SlidingWindow.build(config, Arc::clone(&clock));
 //! let trace = run(&sliding, &clock, &arrivals);
 //! assert_eq!(trace.max_admitted_in_window(config.window()), 10);
-//! # Ok::<(), drl_core::ConfigError>(())
+//! # Ok::<(), ratelab::ConfigError>(())
 //! ```
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
-use drl_core::{Clock, Cost, Decision, ManualClock, Nanos, RateLimitConfig, RateLimiter};
+use ratelab::{Clock, Cost, Decision, ManualClock, Nanos, RateLimitConfig, RateLimiter};
 use std::time::Duration;
 
 pub mod cluster;
@@ -237,7 +237,7 @@ pub fn run<L: RateLimiter + ?Sized>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use drl_core::Algorithm;
+    use ratelab::Algorithm;
     use std::sync::Arc;
 
     fn replay(a: Algorithm, config: RateLimitConfig, arrivals: &[Arrival]) -> Trace {

@@ -20,7 +20,7 @@ struct Bucket {
 /// fast as the bucket drains.
 ///
 /// ```
-/// use drl_core::{Cost, LeakyBucket, ManualClock, RateLimitConfig, RateLimiter};
+/// use ratelab::{Cost, LeakyBucket, ManualClock, RateLimitConfig, RateLimiter};
 /// use std::time::Duration;
 ///
 /// let clock = ManualClock::new();
@@ -30,7 +30,7 @@ struct Bucket {
 ///
 /// clock.advance(Duration::from_millis(500)); // half a window drains one unit
 /// assert!(limiter.check("k", Cost::ONE).allowed);
-/// # Ok::<(), drl_core::ConfigError>(())
+/// # Ok::<(), ratelab::ConfigError>(())
 /// ```
 #[derive(Debug)]
 pub struct LeakyBucket<C> {

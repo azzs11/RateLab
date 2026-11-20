@@ -14,8 +14,8 @@
 
 use crate::local::{ACCURACY_LIMIT, Scenario};
 use crate::stats::Summary;
-use drl_core::strategies::Strategy;
-use drl_core::{FailurePolicy, Nanos, RateLimitConfig};
+use ratelab::strategies::Strategy;
+use ratelab::{FailurePolicy, Nanos, RateLimitConfig};
 use serde::{Deserialize, Serialize};
 use sim::cluster::{ClusterArrival, ClusterConfig, ClusterRun, place, run_cluster};
 use sim::metrics::{self, Measured, WindowCounts};
@@ -515,7 +515,7 @@ mod tests {
                 arrival: sim::Arrival {
                     at: Nanos(i * 10 * ms),
                     key: 0,
-                    cost: drl_core::Cost::ONE,
+                    cost: ratelab::Cost::ONE,
                 },
                 node: 0,
             })
@@ -528,9 +528,9 @@ mod tests {
                     node: 0,
                     decided_at: c.arrival.at,
                     decision: if c.arrival.at.0 < 300 * ms {
-                        drl_core::Decision::deny(drl_core::Tokens(0), Duration::ZERO, None)
+                        ratelab::Decision::deny(ratelab::Tokens(0), Duration::ZERO, None)
                     } else {
-                        drl_core::Decision::allow(drl_core::Tokens(0), Duration::ZERO)
+                        ratelab::Decision::allow(ratelab::Tokens(0), Duration::ZERO)
                     },
                 })
                 .collect(),

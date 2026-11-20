@@ -62,7 +62,7 @@ impl Algorithm {
     /// Builds a boxed limiter of this kind.
     ///
     /// ```
-    /// use drl_core::{Algorithm, Cost, ManualClock, RateLimitConfig};
+    /// use ratelab::{Algorithm, Cost, ManualClock, RateLimitConfig};
     ///
     /// let algorithm: Algorithm = "fixed_window".parse()?;
     /// let limiter = algorithm.build(RateLimitConfig::per_second(1)?, ManualClock::new());

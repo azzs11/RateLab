@@ -33,7 +33,7 @@ impl<C: Clock + ?Sized> Clock for Arc<C> {
 /// advance it:
 ///
 /// ```
-/// use drl_core::{Clock, ManualClock, Nanos};
+/// use ratelab::{Clock, ManualClock, Nanos};
 /// use std::sync::Arc;
 /// use std::time::Duration;
 ///
@@ -56,7 +56,7 @@ impl ManualClock {
     /// A clock starting at `start`.
     ///
     /// ```
-    /// use drl_core::{Clock, ManualClock, Nanos};
+    /// use ratelab::{Clock, ManualClock, Nanos};
     ///
     /// assert_eq!(ManualClock::starting_at(Nanos(42)).now(), Nanos(42));
     /// ```
@@ -69,7 +69,7 @@ impl ManualClock {
     /// Moves time forward by `d` (saturating at `u64::MAX` nanoseconds).
     ///
     /// ```
-    /// use drl_core::{Clock, ManualClock, Nanos};
+    /// use ratelab::{Clock, ManualClock, Nanos};
     /// use std::time::Duration;
     ///
     /// let clock = ManualClock::new();
@@ -97,7 +97,7 @@ impl ManualClock {
     /// clock stays monotonic.
     ///
     /// ```
-    /// use drl_core::{Clock, ManualClock, Nanos};
+    /// use ratelab::{Clock, ManualClock, Nanos};
     ///
     /// let clock = ManualClock::new();
     /// clock.set(Nanos(100));
@@ -117,12 +117,12 @@ impl Clock for ManualClock {
 
 /// The real monotonic clock, measured from when it was created.
 ///
-/// This is the only place in `drl-core` that reads system time. It sits behind the
+/// This is the only place in `ratelab` that reads system time. It sits behind the
 /// default `std-clock` feature; turn that off for targets without a system clock
 /// (such as `wasm32-unknown-unknown`) and pass time in through [`ManualClock`].
 ///
 /// ```
-/// use drl_core::{Clock, MonotonicClock};
+/// use ratelab::{Clock, MonotonicClock};
 ///
 /// let clock = MonotonicClock::new();
 /// let a = clock.now();

@@ -2,8 +2,8 @@
 //! that produced RESULTS.md.
 
 use crate::traffic::{Traffic, config, ms_to_nanos};
-use drl_core::strategies::{StoreOp, StoreReply, Strategy};
-use drl_core::{FailurePolicy, Nanos};
+use ratelab::strategies::{StoreOp, StoreReply, Strategy};
+use ratelab::{FailurePolicy, Nanos};
 use sim::cluster::{ClusterConfig, place, run_cluster};
 use sim::metrics;
 use std::time::Duration;
@@ -108,7 +108,7 @@ pub struct ClusterView {
     ideal_admitted: u32,
 }
 
-fn strategy(name: &str, config: drl_core::RateLimitConfig, nodes: u64) -> Result<Strategy, String> {
+fn strategy(name: &str, config: ratelab::RateLimitConfig, nodes: u64) -> Result<Strategy, String> {
     if name == "central_exact_node_clock" {
         return Ok(Strategy::CentralExact { node_clock: true });
     }

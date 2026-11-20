@@ -7,12 +7,12 @@
 //! - **Redis `TIME`:** the script reads Redis's clock, so application servers with
 //!   skewed clocks still agree on the bucket.
 //! - **Exact integers:** token amounts are scaled by the window in microseconds, the
-//!   same way `drl-core` scales by nanoseconds, so there is no float rounding.
+//!   same way `ratelab` scales by nanoseconds, so there is no float rounding.
 //! - **Circuit breaker:** [`GuardedLimiter`] wraps the store with a
 //!   [`CircuitBreaker`] and applies a [`FailurePolicy`] when Redis cannot answer.
 //!
 //! ```no_run
-//! use drl_core::{BreakerConfig, CircuitBreaker, Cost, FailurePolicy, ManualClock, RateLimitConfig};
+//! use ratelab::{BreakerConfig, CircuitBreaker, Cost, FailurePolicy, ManualClock, RateLimitConfig};
 //! use drl_redis_store::{GuardedLimiter, RedisRateLimiter};
 //! use std::time::Duration;
 //!
@@ -24,7 +24,7 @@
 //! println!("allowed: {}", decision.allowed);
 //!
 //! // With a breaker: if Redis is down, fail closed for this route.
-//! let clock = ManualClock::new(); // use drl_core::MonotonicClock in a real server
+//! let clock = ManualClock::new(); // use ratelab::MonotonicClock in a real server
 //! let breaker = CircuitBreaker::new(BreakerConfig::new(5, Duration::from_secs(1))?, clock);
 //! let guarded = GuardedLimiter::new(store, breaker);
 //! let checked = guarded.check("user_123", Cost::ONE, FailurePolicy::FailClosed).await;
@@ -37,8 +37,8 @@
 #![deny(missing_docs)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
-use drl_core::strategies::{StoreOp, StoreReply};
-use drl_core::{CircuitBreaker, Clock, Cost, Decision, FailurePolicy, RateLimitConfig, Tokens};
+use ratelab::strategies::{StoreOp, StoreReply};
+use ratelab::{CircuitBreaker, Clock, Cost, Decision, FailurePolicy, RateLimitConfig, Tokens};
 use redis::Script;
 use redis::aio::{ConnectionManager, ConnectionManagerConfig};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -199,7 +199,7 @@ impl RedisRateLimiter {
     }
 
     /// Applies one coordination store operation to `key`'s bucket, atomically, on Redis
-    /// time. This is the shared store that `drl_core::strategies` talks to, so every
+    /// time. This is the shared store that `ratelab::strategies` talks to, so every
     /// strategy can run against a real Redis. `Check { at: Some(..) }` still uses Redis
     /// time: a real store never trusts the caller's clock.
     pub async fn apply(&self, key: &str, op: &StoreOp) -> Result<StoreReply, StoreError> {

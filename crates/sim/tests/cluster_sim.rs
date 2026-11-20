@@ -1,7 +1,7 @@
 //! The simulator's mechanics: delay, jitter, timeouts, outages and clock skew.
 
-use drl_core::strategies::Strategy;
-use drl_core::{Cost, FailurePolicy, Nanos, RateLimitConfig};
+use ratelab::strategies::Strategy;
+use ratelab::{Cost, FailurePolicy, Nanos, RateLimitConfig};
 use sim::Arrival;
 use sim::cluster::{ClusterArrival, ClusterConfig, ClusterRun, Outcome, run_cluster};
 use std::time::Duration;

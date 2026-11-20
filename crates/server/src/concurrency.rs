@@ -12,10 +12,10 @@
 
 use axum::body::Body;
 use axum::http::{HeaderName, HeaderValue, Request, Response, StatusCode};
-use drl_core::concurrency::{
+use ratelab::concurrency::{
     AimdConfig, Completion, Concurrency, ConcurrencyLimiter, Gradient2Config, Ticket,
 };
-use drl_core::{Clock, MonotonicClock, Nanos};
+use ratelab::{Clock, MonotonicClock, Nanos};
 use std::convert::Infallible;
 use std::future::Future;
 use std::pin::Pin;
@@ -27,7 +27,7 @@ use tower::{Layer, Service};
 /// with their default settings).
 ///
 /// ```
-/// use drl_core::concurrency::Concurrency;
+/// use ratelab::concurrency::Concurrency;
 /// use server::concurrency::parse;
 ///
 /// assert_eq!(parse("off"), Ok(None));
@@ -193,7 +193,7 @@ mod tests {
     use super::*;
     use axum::Router;
     use axum::routing::get;
-    use drl_core::ManualClock;
+    use ratelab::ManualClock;
     use std::time::Duration;
     use tokio::sync::{Notify, oneshot};
     use tower::ServiceExt;

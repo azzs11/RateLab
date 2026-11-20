@@ -11,11 +11,11 @@
 
 use anyhow::{Context, bail};
 use clap::{Parser, ValueEnum};
-use drl_core::concurrency::ConcurrencyLimiter;
-use drl_core::{
+use drl_redis_store::{GuardedLimiter, RedisOptions, RedisRateLimiter};
+use ratelab::concurrency::ConcurrencyLimiter;
+use ratelab::{
     Algorithm, BreakerConfig, CircuitBreaker, FailurePolicy, MonotonicClock, RateLimitConfig,
 };
-use drl_redis_store::{GuardedLimiter, RedisOptions, RedisRateLimiter};
 use server::backend::Backend;
 use server::layer::Limits;
 use server::strategy::StrategyBackend;
@@ -176,7 +176,7 @@ async fn main() -> anyhow::Result<()> {
         concurrency.map(|c| Arc::new(ConcurrencyLimiter::new(c))),
     );
     if args.llm {
-        use drl_core::tokens::{Accounting, ModelPolicy, TokenLimiter, TokenPolicy};
+        use ratelab::tokens::{Accounting, ModelPolicy, TokenLimiter, TokenPolicy};
         use server::llm::{MockModel, TokenLimitLayer, mock_router};
         let accounting: Accounting = args.token_accounting.parse()?;
         let policy = TokenPolicy::new(

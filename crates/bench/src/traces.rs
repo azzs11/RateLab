@@ -7,8 +7,8 @@
 //! ("please do not attempt any analysis beyond general traffic patterns").
 
 use anyhow::{Context, bail};
-use drl_core::{Cost, Nanos};
 use flate2::read::GzDecoder;
+use ratelab::{Cost, Nanos};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sim::Arrival;

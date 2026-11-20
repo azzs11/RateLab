@@ -6,7 +6,7 @@
 //! use [`ManualClock`] instead of sleeping.
 //!
 //! ```
-//! use drl_core::{Cost, ManualClock, RateLimitConfig, RateLimiter, TokenBucket};
+//! use ratelab::{Cost, ManualClock, RateLimitConfig, RateLimiter, TokenBucket};
 //! use std::time::Duration;
 //!
 //! let clock = ManualClock::new();
@@ -20,7 +20,7 @@
 //! // Wait exactly as long as the limiter says, then retry.
 //! clock.advance(denied.retry_after.unwrap());
 //! assert!(limiter.check("alice", Cost::ONE).allowed);
-//! # Ok::<(), drl_core::ConfigError>(())
+//! # Ok::<(), ratelab::ConfigError>(())
 //! ```
 
 #![forbid(unsafe_code)]
@@ -72,7 +72,7 @@ impl RateLimitConfig {
     /// A limit of `limit` units per `window`.
     ///
     /// ```
-    /// use drl_core::{ConfigError, RateLimitConfig};
+    /// use ratelab::{ConfigError, RateLimitConfig};
     /// use std::time::Duration;
     ///
     /// let config = RateLimitConfig::new(100, Duration::from_secs(60))?;
@@ -98,12 +98,12 @@ impl RateLimitConfig {
     /// `limit` units per second.
     ///
     /// ```
-    /// use drl_core::RateLimitConfig;
+    /// use ratelab::RateLimitConfig;
     /// use std::time::Duration;
     ///
     /// let config = RateLimitConfig::per_second(10)?;
     /// assert_eq!(config.window(), Duration::from_secs(1));
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn per_second(limit: u64) -> Result<Self, ConfigError> {
         Self::new(limit, Duration::from_secs(1))
@@ -112,12 +112,12 @@ impl RateLimitConfig {
     /// `limit` units per minute.
     ///
     /// ```
-    /// use drl_core::RateLimitConfig;
+    /// use ratelab::RateLimitConfig;
     /// use std::time::Duration;
     ///
     /// let config = RateLimitConfig::per_minute(10)?;
     /// assert_eq!(config.window(), Duration::from_secs(60));
-    /// # Ok::<(), drl_core::ConfigError>(())
+    /// # Ok::<(), ratelab::ConfigError>(())
     /// ```
     pub fn per_minute(limit: u64) -> Result<Self, ConfigError> {
         Self::new(limit, Duration::from_secs(60))

@@ -12,7 +12,7 @@
 use crate::machine::Machine;
 use crate::oracle::ExactOracle;
 use crate::stats::{Summary, percentile};
-use drl_core::{Algorithm, Cost, Decision, ManualClock, Nanos, RateLimitConfig, Tokens};
+use ratelab::{Algorithm, Cost, Decision, ManualClock, Nanos, RateLimitConfig, Tokens};
 use serde::{Deserialize, Serialize};
 use sim::{Arrival, Step, Trace};
 use std::sync::Arc;

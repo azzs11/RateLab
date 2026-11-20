@@ -4,12 +4,12 @@
 //! with `cargo test -p drl-redis-store -- --ignored` on every push, so they are never
 //! skipped there. Locally: start Docker, then run the same command.
 
-use drl_core::strategies::{Store, StoreOp, StoreReply};
-use drl_core::{
+use drl_redis_store::{GuardedLimiter, RedisOptions, RedisRateLimiter, Source};
+use ratelab::strategies::{Store, StoreOp, StoreReply};
+use ratelab::{
     BreakerConfig, BreakerState, CircuitBreaker, Cost, FailurePolicy, ManualClock, Nanos,
 };
-use drl_core::{RateLimitConfig, Tokens};
-use drl_redis_store::{GuardedLimiter, RedisOptions, RedisRateLimiter, Source};
+use ratelab::{RateLimitConfig, Tokens};
 use std::sync::Arc;
 use std::time::Duration;
 use testcontainers_modules::redis::{REDIS_PORT, Redis};

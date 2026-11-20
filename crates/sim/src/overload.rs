@@ -12,7 +12,7 @@
 //! and learns from every answered request.
 //!
 //! ```
-//! use drl_core::concurrency::{Concurrency, ConcurrencyLimiter};
+//! use ratelab::concurrency::{Concurrency, ConcurrencyLimiter};
 //! use sim::overload::{OverloadConfig, measure, requests, run};
 //! use std::time::Duration;
 //!
@@ -36,8 +36,8 @@
 
 use crate::SplitMix64;
 use crate::scenarios::{exponential_q32, scale};
-use drl_core::Nanos;
-use drl_core::concurrency::{Completion, ConcurrencyLimiter, Ticket};
+use ratelab::Nanos;
+use ratelab::concurrency::{Completion, ConcurrencyLimiter, Ticket};
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, VecDeque};
 use std::time::Duration;
@@ -72,7 +72,7 @@ impl OverloadConfig {
     ///     load: vec![(s(0), 100), (s(10), 300)],
     ///     workers: vec![(s(0), 1)],
     /// };
-    /// assert_eq!(c.rate_at(drl_core::Nanos::from_duration(s(5))), 200);
+    /// assert_eq!(c.rate_at(ratelab::Nanos::from_duration(s(5))), 200);
     /// ```
     pub fn rate_at(&self, t: Nanos) -> u64 {
         let t = t.0;
@@ -106,7 +106,7 @@ impl OverloadConfig {
     ///     load: vec![(s(0), 1)],
     ///     workers: vec![(s(0), 8), (s(5), 2)],
     /// };
-    /// assert_eq!(c.workers_at(drl_core::Nanos::from_duration(s(6))), 2);
+    /// assert_eq!(c.workers_at(ratelab::Nanos::from_duration(s(6))), 2);
     /// ```
     pub fn workers_at(&self, t: Nanos) -> usize {
         self.workers
@@ -128,7 +128,7 @@ impl OverloadConfig {
     ///     load: vec![(Duration::ZERO, 1)],
     ///     workers: vec![(Duration::ZERO, 16)],
     /// };
-    /// assert_eq!(c.capacity_at(drl_core::Nanos(0)), 800.0);
+    /// assert_eq!(c.capacity_at(ratelab::Nanos(0)), 800.0);
     /// ```
     pub fn capacity_at(&self, t: Nanos) -> f64 {
         let s = self.service_mean.as_secs_f64();
@@ -486,7 +486,7 @@ pub fn measure(config: &OverloadConfig, served: &[Served], bucket: Duration) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use drl_core::concurrency::{AimdConfig, Concurrency, Gradient2Config};
+    use ratelab::concurrency::{AimdConfig, Concurrency, Gradient2Config};
 
     fn ms(v: u64) -> Duration {
         Duration::from_millis(v)

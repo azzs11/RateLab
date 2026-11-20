@@ -32,7 +32,7 @@ const ALGORITHMS: { name: string; state: string }[] = [
   { name: "gcra", state: "one timestamp" },
 ];
 
-/** The decision at the heart of drl_core::Gcra::check, verbatim. */
+/** The decision at the heart of ratelab::Gcra::check, verbatim. */
 const GCRA = `let base = (*tat).max(now);
 let new_tat = base.saturating_add(increment);
 let allowed = new_tat - now <= tolerance;
@@ -40,7 +40,7 @@ if allowed {
     *tat = new_tat;
 }`;
 
-const USE_RUST = `use drl_core::{Cost, RateLimitConfig, RateLimiter, TokenBucket};
+const USE_RUST = `use ratelab::{Cost, RateLimitConfig, RateLimiter, TokenBucket};
 
 let limiter = TokenBucket::new(RateLimitConfig::per_second(100)?);
 let d = limiter.check("user_42", Cost::ONE);
@@ -117,7 +117,7 @@ function attackSection(core: Core | null, holder: { fig: AttackFigure | null }):
   const fig = figure(
     "1",
     "The boundary attack.",
-    "Dots were allowed, crosses refused, each one a decision by drl-core compiled to WebAssembly and running in this page. Window edges are the vertical rules.",
+    "Dots were allowed, crosses refused, each one a decision by ratelab compiled to WebAssembly and running in this page. Window edges are the vertical rules.",
     h("div", { class: "figure-body" }, holder.fig ? holder.fig.el : body),
   );
   fig.classList.add("wide");

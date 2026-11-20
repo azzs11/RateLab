@@ -29,8 +29,8 @@ struct KeyState {
 /// keeps deciding on its own share.
 ///
 /// ```
-/// use drl_core::strategies::{AsyncSync, CoordinationStrategy, Outbox, Store};
-/// use drl_core::{Cost, Nanos, RateLimitConfig};
+/// use ratelab::strategies::{AsyncSync, CoordinationStrategy, Outbox, Store};
+/// use ratelab::{Cost, Nanos, RateLimitConfig};
 /// use std::time::Duration;
 ///
 /// let config = RateLimitConfig::per_second(10)?;
@@ -42,7 +42,7 @@ struct KeyState {
 ///
 /// node.on_tick(Nanos(10_000_000), &mut out); // reports the 1 token spent
 /// assert_eq!(out.messages.len(), 1);
-/// # Ok::<(), drl_core::ConfigError>(())
+/// # Ok::<(), ratelab::ConfigError>(())
 /// ```
 #[derive(Debug)]
 pub struct AsyncSync {

@@ -1,4 +1,4 @@
--- The coordination store protocol on one Redis token bucket (see drl_core::strategies).
+-- The coordination store protocol on one Redis token bucket (see ratelab::strategies).
 --
 -- Same layout and arithmetic as token_bucket.lua: amounts are scaled by the window in
 -- microseconds, time is Redis TIME, values stay exact below 2^53.

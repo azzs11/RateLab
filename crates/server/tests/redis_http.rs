@@ -3,8 +3,8 @@
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use drl_core::{BreakerConfig, CircuitBreaker, MonotonicClock, RateLimitConfig};
 use drl_redis_store::{GuardedLimiter, RedisOptions, RedisRateLimiter};
+use ratelab::{BreakerConfig, CircuitBreaker, MonotonicClock, RateLimitConfig};
 use server::app;
 use server::backend::Backend;
 use server::layer::Limits;

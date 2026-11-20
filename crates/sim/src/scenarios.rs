@@ -7,7 +7,7 @@
 //! same arrivals on every platform, including WebAssembly.
 
 use crate::{Arrival, SplitMix64};
-use drl_core::{Cost, Nanos};
+use ratelab::{Cost, Nanos};
 use std::time::Duration;
 
 /// Fractional bits of the fixed-point values below.
@@ -248,7 +248,7 @@ fn gap_from_rate(rate_q32: u64) -> u64 {
 /// Merges arrival lists into one list sorted by time (stable for equal times).
 ///
 /// ```
-/// use drl_core::{Cost, Nanos};
+/// use ratelab::{Cost, Nanos};
 /// use sim::{merge, Arrival};
 ///
 /// let a = vec![Arrival { at: Nanos(5), key: 0, cost: Cost::ONE }];

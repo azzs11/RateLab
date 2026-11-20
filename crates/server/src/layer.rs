@@ -19,7 +19,7 @@ use crate::metrics::{self, Stats};
 use axum::body::Body;
 use axum::extract::ConnectInfo;
 use axum::http::{HeaderMap, HeaderName, HeaderValue, Request, Response, StatusCode};
-use drl_core::{Cost, FailurePolicy};
+use ratelab::{Cost, FailurePolicy};
 use std::convert::Infallible;
 use std::future::Future;
 use std::net::SocketAddr;
