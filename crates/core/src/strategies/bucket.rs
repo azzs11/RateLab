@@ -80,6 +80,31 @@ impl ShareBucket {
         }
     }
 
+    /// Refill the way an application-clock script does it: always store the caller's
+    /// time as the last update, even when it is earlier than the previous one. With
+    /// skewed callers, every jump forward refills again.
+    ///
+    /// ```
+    /// use drl_core::strategies::ShareBucket;
+    /// use drl_core::{Nanos, RateLimitConfig};
+    ///
+    /// let config = RateLimitConfig::per_second(10)?;
+    /// let mut b = ShareBucket::new(config, 1, Nanos(1_000_000_000));
+    /// b.take_up_to(10);
+    /// // No real time passes, but callers alternate between clocks 100 ms apart:
+    /// // each jump forward refills one token (100 ms at 10 per second).
+    /// for _ in 0..3 {
+    ///     b.refill_trusting(Nanos(1_100_000_000));
+    ///     b.refill_trusting(Nanos(1_000_000_000));
+    /// }
+    /// assert_eq!(b.tokens(), 3);
+    /// # Ok::<(), drl_core::ConfigError>(())
+    /// ```
+    pub fn refill_trusting(&mut self, now: Nanos) {
+        self.refill(now);
+        self.last = now.0;
+    }
+
     /// Whole tokens available.
     pub fn tokens(&self) -> u64 {
         u64::try_from(self.level / self.unit).unwrap_or(u64::MAX)

@@ -63,9 +63,18 @@ impl Store {
         self.ops += 1;
         match *op {
             StoreOp::Check { cost, at } => {
-                // `at` is the node's clock when the node supplies the time (as an
-                // application-clock Redis script would); otherwise the store's own.
-                let bucket = self.bucket(key, at.unwrap_or(now));
+                // `at` is the node's clock when the node supplies the time. That is
+                // handled like an application-clock script (such as this project's
+                // first Redis prototype): the caller's time is stored as is, even when
+                // it is earlier than the last one. Otherwise the store uses its own clock.
+                let bucket = match at {
+                    Some(t) => {
+                        let bucket = self.bucket(key, Nanos::ZERO);
+                        bucket.refill_trusting(t);
+                        bucket
+                    }
+                    None => self.bucket(key, now),
+                };
                 let allowed = bucket.try_take(cost.0);
                 StoreReply::Checked(bucket.decision(allowed, cost.0))
             }
@@ -153,6 +162,12 @@ mod tests {
         };
         assert!(matches!(s.handle(Nanos(0), "k", &at(0)), StoreReply::Checked(d) if d.allowed));
         // Store time says no time passed, but the node claims a second did.
+        assert!(
+            matches!(s.handle(Nanos(0), "k", &at(1_000_000_000)), StoreReply::Checked(d) if d.allowed)
+        );
+        // A caller whose clock is behind resets the last update time, so the next
+        // caller that is ahead refills again.
+        assert!(matches!(s.handle(Nanos(0), "k", &at(0)), StoreReply::Checked(d) if !d.allowed));
         assert!(
             matches!(s.handle(Nanos(0), "k", &at(1_000_000_000)), StoreReply::Checked(d) if d.allowed)
         );
