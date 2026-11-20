@@ -28,10 +28,10 @@ jobs:
       run: cargo fmt --all -- --check
 
     - name: Run clippy
-      run: cargo clippy --workspace --all-targets -- -D warnings
+      run: cargo clippy --locked --workspace --all-targets -- -D warnings
 
     - name: Run tests
-      run: cargo test --workspace
+      run: cargo test --locked --workspace
 
     - name: No sleeps in library or test code
       run: |
@@ -52,7 +52,7 @@ jobs:
     - uses: Swatinem/rust-cache@v2
 
     - name: Test on the minimum supported Rust version
-      run: cargo test --workspace
+      run: cargo test --locked --workspace
 
   wasm:
     name: wasm32 build
@@ -69,10 +69,10 @@ jobs:
     - uses: Swatinem/rust-cache@v2
 
     - name: Clippy for wasm32
-      run: cargo clippy -p wasm --target wasm32-unknown-unknown -- -D warnings
+      run: cargo clippy --locked -p wasm --target wasm32-unknown-unknown -- -D warnings
 
     - name: Build for wasm32
-      run: cargo build -p wasm --target wasm32-unknown-unknown --release
+      run: cargo build --locked -p wasm --target wasm32-unknown-unknown --release
 
   redis:
     name: Redis integration
@@ -96,4 +96,4 @@ jobs:
     - uses: Swatinem/rust-cache@v2
 
     - name: Run tests that need a live Redis
-      run: cargo test -p drl-redis-store -- --ignored
+      run: cargo test --locked -p drl-redis-store -- --ignored
