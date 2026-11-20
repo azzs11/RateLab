@@ -1,9 +1,12 @@
-//! Where decisions come from: an in-process limiter or Redis behind a circuit breaker.
+//! Where decisions come from: an in-process limiter, Redis behind a circuit breaker, or
+//! a coordination strategy running against Redis.
 
+use crate::strategy::StrategyBackend;
 use drl_core::{
     Clock, Cost, Decision, FailurePolicy, MonotonicClock, RateLimitConfig, RateLimiter,
 };
 use drl_redis_store::{GuardedLimiter, Source};
+use std::sync::Arc;
 
 /// Who made a decision.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,6 +19,8 @@ pub enum DecisionSource {
     BreakerOpen,
     /// Redis failed; the route's failure policy decided.
     RedisError,
+    /// A coordination strategy (locally, or after asking Redis).
+    Strategy,
 }
 
 impl DecisionSource {
@@ -26,12 +31,16 @@ impl DecisionSource {
             DecisionSource::Redis => "redis",
             DecisionSource::BreakerOpen => "breaker_open",
             DecisionSource::RedisError => "redis_error",
+            DecisionSource::Strategy => "strategy",
         }
     }
 
     /// Whether the limiter itself decided (as opposed to a failure policy).
     pub fn is_enforced(self) -> bool {
-        matches!(self, DecisionSource::Local | DecisionSource::Redis)
+        matches!(
+            self,
+            DecisionSource::Local | DecisionSource::Redis | DecisionSource::Strategy
+        )
     }
 }
 
@@ -55,6 +64,8 @@ pub enum Backend<C = MonotonicClock> {
     },
     /// Redis-backed token bucket shared by all nodes.
     Redis(GuardedLimiter<C>),
+    /// A coordination strategy whose shared store is Redis.
+    Strategy(Arc<StrategyBackend>),
 }
 
 impl<C: Clock> Backend<C> {
@@ -63,6 +74,7 @@ impl<C: Clock> Backend<C> {
         match self {
             Backend::Local { config, .. } => *config,
             Backend::Redis(guarded) => guarded.store().config(),
+            Backend::Strategy(s) => s.config(),
         }
     }
 
@@ -71,6 +83,7 @@ impl<C: Clock> Backend<C> {
         match self {
             Backend::Local { .. } => "local",
             Backend::Redis(_) => "redis",
+            Backend::Strategy(_) => "strategy",
         }
     }
 
@@ -80,6 +93,10 @@ impl<C: Clock> Backend<C> {
             Backend::Local { limiter, .. } => Outcome {
                 decision: limiter.check(key, cost),
                 source: DecisionSource::Local,
+            },
+            Backend::Strategy(s) => Outcome {
+                decision: s.check(key, cost).await,
+                source: DecisionSource::Strategy,
             },
             Backend::Redis(guarded) => {
                 let checked = guarded.check(key, cost, policy).await;

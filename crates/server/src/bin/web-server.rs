@@ -9,10 +9,13 @@
 
 use anyhow::{Context, bail};
 use clap::{Parser, ValueEnum};
-use drl_core::{Algorithm, BreakerConfig, CircuitBreaker, MonotonicClock, RateLimitConfig};
+use drl_core::{
+    Algorithm, BreakerConfig, CircuitBreaker, FailurePolicy, MonotonicClock, RateLimitConfig,
+};
 use drl_redis_store::{GuardedLimiter, RedisOptions, RedisRateLimiter};
 use server::backend::Backend;
 use server::layer::Limits;
+use server::strategy::StrategyBackend;
 use server::{app, metrics};
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -26,6 +29,8 @@ enum BackendKind {
     Local,
     /// State in Redis, shared by every node.
     Redis,
+    /// A coordination strategy (see `--strategy`) with Redis as the shared store.
+    Strategy,
 }
 
 #[derive(Debug, Parser)]
@@ -61,6 +66,15 @@ struct Args {
     /// How long the breaker stays open, in milliseconds.
     #[arg(long, env = "DRL_BREAKER_OPEN_MS", default_value_t = 1000)]
     breaker_open_ms: u64,
+    /// Coordination strategy for the strategy backend.
+    #[arg(long, env = "DRL_STRATEGY", default_value = "adaptive_leasing")]
+    strategy: String,
+    /// Nodes in the cluster (strategies like local split need it).
+    #[arg(long, env = "DRL_NODES", default_value_t = 3)]
+    nodes: u64,
+    /// Enable the benchmark-only /admin routes (strategy switching). Never in production.
+    #[arg(long, env = "DRL_ADMIN", default_value_t = false)]
+    admin: bool,
     /// Directory with the built playground (`cd web && npm run build`). Static files are
     /// served from here when it exists.
     #[arg(long, env = "DRL_WEB_DIR", default_value = "web/dist")]
@@ -89,6 +103,22 @@ async fn main() -> anyhow::Result<()> {
             }
             Backend::Redis(connect_redis(&args, config).await?)
         }
+        BackendKind::Strategy => {
+            let options = RedisOptions {
+                response_timeout: Duration::from_millis(args.redis_timeout_ms),
+                ..RedisOptions::default()
+            };
+            let store = connect_store(&args.redis_url, config, options).await?;
+            let backend = StrategyBackend::start(
+                &args.strategy,
+                store,
+                args.nodes,
+                FailurePolicy::FailOpen,
+                Duration::from_millis(args.redis_timeout_ms),
+            )
+            .map_err(anyhow::Error::msg)?;
+            Backend::Strategy(backend)
+        }
     };
     tracing::info!(
         node = %args.node_id,
@@ -110,7 +140,11 @@ async fn main() -> anyhow::Result<()> {
             "no built playground found; serving the API only (build it with `just site`)"
         );
     }
-    let router = app::router(limits, Some(prometheus), &args.web_dir);
+    let mut router = app::router(Arc::clone(&limits), Some(prometheus), &args.web_dir);
+    if args.admin {
+        tracing::warn!("benchmark-only /admin routes are enabled");
+        router = router.merge(app::admin_router(limits));
+    }
     let listener = tokio::net::TcpListener::bind(args.bind)
         .await
         .with_context(|| format!("bind {}", args.bind))?;
@@ -133,18 +167,7 @@ async fn connect_redis(
         response_timeout: Duration::from_millis(args.redis_timeout_ms),
         ..RedisOptions::default()
     };
-    let mut attempt = 0;
-    let store = loop {
-        match RedisRateLimiter::connect_with(&args.redis_url, config, options.clone()).await {
-            Ok(store) => break store,
-            Err(e) if attempt < 20 => {
-                attempt += 1;
-                tracing::warn!(error = %e, attempt, "Redis not reachable yet, retrying");
-                tokio::time::sleep(Duration::from_millis(250)).await;
-            }
-            Err(e) => return Err(e).context("connect to Redis"),
-        }
-    };
+    let store = connect_store(&args.redis_url, config, options).await?;
     let breaker_config = BreakerConfig::new(
         args.breaker_failures,
         Duration::from_millis(args.breaker_open_ms),
@@ -153,6 +176,26 @@ async fn connect_redis(
         store,
         CircuitBreaker::new(breaker_config, MonotonicClock::new()),
     ))
+}
+
+/// Connects to Redis, retrying for a few seconds while it starts up.
+async fn connect_store(
+    url: &str,
+    config: RateLimitConfig,
+    options: RedisOptions,
+) -> anyhow::Result<RedisRateLimiter> {
+    let mut attempt = 0;
+    loop {
+        match RedisRateLimiter::connect_with(url, config, options.clone()).await {
+            Ok(store) => return Ok(store),
+            Err(e) if attempt < 20 => {
+                attempt += 1;
+                tracing::warn!(error = %e, attempt, "Redis not reachable yet, retrying");
+                tokio::time::sleep(Duration::from_millis(250)).await;
+            }
+            Err(e) => return Err(e).context("connect to Redis"),
+        }
+    }
 }
 
 async fn shutdown() {

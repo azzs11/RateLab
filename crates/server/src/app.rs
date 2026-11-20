@@ -62,6 +62,40 @@ pub fn router(
         .with_state(state)
 }
 
+/// Benchmark-only routes, added when the server runs with `DRL_ADMIN=1`:
+/// `GET /admin/strategy` reports the running strategy and its store calls, and
+/// `POST /admin/strategy/{name}` switches to another one.
+pub fn admin_router(limits: Arc<Limits>) -> Router {
+    Router::new()
+        .route("/admin/strategy", get(admin_current))
+        .route("/admin/strategy/{name}", post(admin_switch))
+        .with_state(limits)
+}
+
+async fn admin_current(State(limits): State<Arc<Limits>>) -> Response {
+    match &limits.backend {
+        crate::backend::Backend::Strategy(s) => Json(serde_json::json!({
+            "strategy": s.name(),
+            "store_calls": s.store_calls(),
+        }))
+        .into_response(),
+        _ => (StatusCode::NOT_FOUND, "not running a coordination strategy").into_response(),
+    }
+}
+
+async fn admin_switch(
+    State(limits): State<Arc<Limits>>,
+    axum::extract::Path(name): axum::extract::Path<String>,
+) -> Response {
+    match &limits.backend {
+        crate::backend::Backend::Strategy(s) => match s.switch(&name) {
+            Ok(()) => (StatusCode::OK, name).into_response(),
+            Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
+        },
+        _ => (StatusCode::NOT_FOUND, "not running a coordination strategy").into_response(),
+    }
+}
+
 async fn hello(State(state): State<AppState>) -> Json<serde_json::Value> {
     Json(serde_json::json!({ "message": "hello", "node": state.limits.node_id }))
 }
