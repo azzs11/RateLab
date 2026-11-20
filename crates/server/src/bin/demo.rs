@@ -18,7 +18,10 @@ async fn main() {
         }
     };
 
-    println!("Testing all 4 rate limiting algorithms WITH METRICS");
+    println!(
+        "Testing all {} rate limiting algorithms WITH METRICS",
+        Algorithm::ALL.len()
+    );
     println!("Config: 3 requests per second\n");
 
     let descriptions = [
@@ -26,6 +29,7 @@ async fn main() {
         "(Queue that leaks at constant rate)",
         "(Counter resets every window)",
         "(Tracks exact timestamps)",
+        "(One theoretical arrival time per key)",
     ];
     for (n, (algorithm, about)) in Algorithm::ALL.iter().zip(descriptions).enumerate() {
         println!(
@@ -40,7 +44,7 @@ async fn main() {
         println!("\n");
     }
 
-    println!("5. REDIS (prototype)");
+    println!("{}. REDIS (prototype)", Algorithm::ALL.len() + 1);
     println!("   (Token Bucket with Redis backend)");
     println!("   ----------------------------");
     run_redis(config);

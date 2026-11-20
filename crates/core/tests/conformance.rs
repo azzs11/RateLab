@@ -24,7 +24,10 @@ fn max_per_window(algorithm: Algorithm, limit: u64) -> u64 {
     match algorithm {
         Algorithm::SlidingWindow => limit,
         // A full bucket (or the end of one fixed window) plus one window's worth more.
-        Algorithm::TokenBucket | Algorithm::LeakyBucket | Algorithm::FixedWindow => 2 * limit,
+        Algorithm::TokenBucket
+        | Algorithm::LeakyBucket
+        | Algorithm::FixedWindow
+        | Algorithm::Gcra => 2 * limit,
     }
 }
 

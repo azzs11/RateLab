@@ -32,7 +32,7 @@ pub mod clock;
 pub mod decision;
 pub mod units;
 
-pub use algorithms::{Algorithm, FixedWindow, LeakyBucket, SlidingWindow, TokenBucket};
+pub use algorithms::{Algorithm, FixedWindow, Gcra, LeakyBucket, SlidingWindow, TokenBucket};
 #[cfg(feature = "std-clock")]
 pub use clock::MonotonicClock;
 pub use clock::{Clock, ManualClock};

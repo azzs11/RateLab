@@ -5,11 +5,13 @@
 //! give the same decisions on every platform.
 
 pub mod fixed_window;
+pub mod gcra;
 pub mod leaky_bucket;
 pub mod sliding_window;
 pub mod token_bucket;
 
 pub use fixed_window::FixedWindow;
+pub use gcra::Gcra;
 pub use leaky_bucket::LeakyBucket;
 pub use sliding_window::SlidingWindow;
 pub use token_bucket::TokenBucket;
@@ -32,15 +34,18 @@ pub enum Algorithm {
     FixedWindow,
     /// [`SlidingWindow`]
     SlidingWindow,
+    /// [`Gcra`]
+    Gcra,
 }
 
 impl Algorithm {
     /// Every algorithm, in a stable order.
-    pub const ALL: [Algorithm; 4] = [
+    pub const ALL: [Algorithm; 5] = [
         Algorithm::TokenBucket,
         Algorithm::LeakyBucket,
         Algorithm::FixedWindow,
         Algorithm::SlidingWindow,
+        Algorithm::Gcra,
     ];
 
     /// The snake_case name used by [`FromStr`] and [`Display`](fmt::Display).
@@ -50,6 +55,7 @@ impl Algorithm {
             Algorithm::LeakyBucket => "leaky_bucket",
             Algorithm::FixedWindow => "fixed_window",
             Algorithm::SlidingWindow => "sliding_window",
+            Algorithm::Gcra => "gcra",
         }
     }
 
@@ -74,6 +80,7 @@ impl Algorithm {
             Algorithm::LeakyBucket => Box::new(LeakyBucket::with_clock(config, clock)),
             Algorithm::FixedWindow => Box::new(FixedWindow::with_clock(config, clock)),
             Algorithm::SlidingWindow => Box::new(SlidingWindow::with_clock(config, clock)),
+            Algorithm::Gcra => Box::new(Gcra::with_clock(config, clock)),
         }
     }
 }
