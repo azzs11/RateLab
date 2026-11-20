@@ -403,3 +403,68 @@ tbody th {
 .lab-how h3 {
   margin-bottom: var(--s-2);
 }
+
+/* ---------- Cluster ---------- */
+
+.cluster-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--s-5);
+}
+
+@media (max-width: 900px) {
+  .cluster-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.cluster-diagram {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  padding: var(--s-3);
+}
+
+.cluster-about {
+  margin: var(--s-2) var(--s-2) 0;
+}
+
+.cluster-meter {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.cluster-meter .stat {
+  border-right: 0;
+  border-bottom: 1px solid var(--line);
+  padding: var(--s-3) var(--s-4);
+}
+
+.cluster-meter .stat:nth-child(odd) {
+  border-right: 1px solid var(--line);
+}
+
+.cluster-meter .stat:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.cluster-meter .value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--step-1);
+}
+
+.cluster-meter .value.blocked {
+  color: var(--blocked);
+}
+
+.bins {
+  border-top: 1px solid var(--line);
+}
+
+.spacer {
+  height: var(--s-8);
+}

@@ -458,6 +458,15 @@ input[type="checkbox"] {
   height: 20px;
 }
 
+.field > label.check {
+  font-family: var(--font-text);
+  font-size: 0.95rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+  justify-content: flex-start;
+}
+
 .check {
   display: flex;
   align-items: center;
