@@ -262,6 +262,7 @@ name = "bench"
 version = "0.6.0"
 dependencies = [
  "anyhow",
+ "axum",
  "cap",
  "clap",
  "criterion",
@@ -271,9 +272,11 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "server",
  "sha2",
  "sim",
  "tokio",
+ "tower",
 ]
 
 [[package]]

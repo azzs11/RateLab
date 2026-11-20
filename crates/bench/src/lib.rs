@@ -8,6 +8,8 @@
 //! - [`cluster`]: the 3-node Docker run against Redis (the `loadgen` binary);
 //! - [`strategies`]: the five coordination strategies in the multi-node simulator;
 //! - [`real_strategies`]: the strategies on the real Docker cluster, against the simulator;
+//! - [`overload`]: no limit, static, AIMD and Gradient2 concurrency limits in front of a
+//!   backend with limited capacity, simulated and on the real Tower layer;
 //! - [`real_traffic`]: every algorithm and strategy on a public request log ([`traces`]);
 //! - [`report`]: turns `results/*.json` into RESULTS.md and the README table, with the
 //!   [`machine`] each file was measured on.
@@ -19,6 +21,7 @@ pub mod local;
 pub mod machine;
 pub mod memory;
 pub mod oracle;
+pub mod overload;
 pub mod real_strategies;
 pub mod real_traffic;
 pub mod report;

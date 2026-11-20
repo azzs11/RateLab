@@ -3,6 +3,8 @@
 //! - `local`: in-process accuracy, latency, throughput and fairness → `results/local.json`
 //! - `traces`: a public request log through every algorithm and strategy → `results/traces.json`
 //! - `strategies`: the coordination strategies in the simulator → `results/strategies.json`
+//! - `overload`: concurrency limits in front of a backend with limited capacity, simulated
+//!   and on the real Tower layer → `results/overload.json`
 //! - `report`: `results/*.json` → `results/RESULTS.md` and the README's results table
 //! - `machine`: print this machine's description
 //!
@@ -45,6 +47,19 @@ enum Command {
         #[arg(long, default_value = "results/strategies.json")]
         out: PathBuf,
     },
+    /// No limit, static, AIMD and Gradient2 concurrency limits under overload, in the
+    /// simulator and on the real Tower layer (in real time: about 5 minutes).
+    Overload {
+        /// Short runs and one seed, for checking the pipeline.
+        #[arg(long)]
+        quick: bool,
+        /// Skip the real-time runs.
+        #[arg(long)]
+        sim_only: bool,
+        /// Output file.
+        #[arg(long, default_value = "results/overload.json")]
+        out: PathBuf,
+    },
     /// Replay a public request log (downloaded into memory, never saved) through every
     /// algorithm and strategy.
     Traces {
@@ -73,6 +88,11 @@ fn main() -> anyhow::Result<()> {
         Command::Local { quick, out } => run_local(quick, &out),
         Command::Strategies { quick, out } => run_strategies(quick, &out),
         Command::Traces { quick, out } => run_traces(quick, &out),
+        Command::Overload {
+            quick,
+            sim_only,
+            out,
+        } => run_overload(quick, sim_only, &out),
         Command::Report { dir, readme } => run_report(&dir, &readme),
         Command::Machine => {
             let m = Machine::detect();
@@ -159,6 +179,33 @@ fn run_strategies(quick: bool, out: &std::path::Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn run_overload(quick: bool, sim_only: bool, out: &std::path::Path) -> anyhow::Result<()> {
+    use bench::overload::{self, OverloadResults, OverloadSize};
+    let size = if quick {
+        OverloadSize::quick()
+    } else {
+        OverloadSize::full()
+    };
+    let started = Instant::now();
+    let step = |name: &str| eprintln!("[{:>6.1} s] {name}", started.elapsed().as_secs_f64());
+    let scenarios = overload::run(&size, !sim_only, step);
+    write_json(
+        out,
+        &OverloadResults {
+            schema: SCHEMA,
+            machine: Machine::detect(),
+            size,
+            workers: overload::WORKERS,
+            service_ms: overload::SERVICE_MS,
+            deadline_ms: overload::DEADLINE_MS,
+            bucket_ms: overload::BUCKET_MS,
+            scenarios,
+        },
+    )?;
+    step(&format!("wrote {}", out.display()));
+    Ok(())
+}
+
 fn run_traces(quick: bool, out: &std::path::Path) -> anyhow::Result<()> {
     use bench::real_traffic::{self, TARGET_BLOCKED_PCT, TraceResults, WINDOW_SECS};
     use bench::traces::{self, NASA_KSC_1995, TraceInfo};
@@ -234,6 +281,7 @@ fn run_report(dir: &std::path::Path, readme: &std::path::Path) -> anyhow::Result
         strategies: read_json(&dir.join("strategies.json"))?,
         traces: read_json(&dir.join("traces.json"))?,
         real_strategies: read_json(&dir.join("real_strategies.json"))?,
+        overload: read_json(&dir.join("overload.json"))?,
     };
     for (name, svg) in report::charts(&inputs) {
         let path = dir.join(&name);

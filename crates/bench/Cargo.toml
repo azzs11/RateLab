@@ -12,7 +12,9 @@ default-run = "bench"
 [dependencies]
 drl-core = { workspace = true, features = ["std-clock"] }
 sim = { path = "../sim" }
+server = { path = "../server" }
 anyhow = "1.0"
+axum = { version = "0.8", default-features = false }
 cap = "0.1"
 clap = { version = "4.6", features = ["derive", "env"] }
 flate2 = "1.1"
@@ -22,8 +24,10 @@ sha2 = "0.11"
 redis = { version = "1.8", default-features = false, features = ["tokio-comp"] }
 reqwest = { version = "0.13", default-features = false }
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "time", "sync"] }
+tower = { version = "0.5", features = ["util"] }
 
 [dev-dependencies]
+tokio = { version = "1.54", features = ["test-util"] }
 criterion = { version = "0.8", features = ["html_reports"] }
 
 [[bench]]

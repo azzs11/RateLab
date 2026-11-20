@@ -6,6 +6,7 @@
 use crate::cluster::ClusterResults;
 use crate::local::{ACCURACY_KEYS, ACCURACY_LIMIT, Scenario, TENANTS};
 use crate::machine::Machine;
+use crate::overload::{Agg, OverloadResults, Row as OverloadRow};
 use crate::real_strategies::RealStrategyResults;
 use crate::real_traffic::TraceResults;
 use crate::results::{LocalResults, MemoryResults, StrategyResults};
@@ -34,6 +35,8 @@ pub struct Inputs {
     pub traces: Option<TraceResults>,
     /// `real_strategies.json`.
     pub real_strategies: Option<RealStrategyResults>,
+    /// `overload.json`.
+    pub overload: Option<OverloadResults>,
 }
 
 /// The largest gaps between the real cluster and the simulator: admission error in
@@ -63,6 +66,82 @@ pub fn chart_name(nodes: usize) -> String {
 
 /// The Pareto charts to write next to RESULTS.md: one per cluster size above 1.
 pub fn charts(inputs: &Inputs) -> Vec<(String, String)> {
+    let mut out = pareto_charts(inputs);
+    if let Some(o) = &inputs.overload {
+        out.extend(overload_charts(o));
+    }
+    out
+}
+
+/// File name of the overload chart for a scenario.
+pub fn overload_chart_name(scenario: &str) -> String {
+    format!("overload-{scenario}.svg")
+}
+
+/// Colour, dash pattern and width per limiter (Okabe–Ito colours).
+const LIMITER_STYLES: [(&str, &str, &str, f64); 4] = [
+    ("none", "#E69F00", "9 3 2 3", 2.0),
+    ("static", "#0072B2", "", 2.0),
+    ("aimd", "#CC79A7", "5 3", 2.0),
+    ("gradient2", "#009E73", "", 3.0),
+];
+
+/// Goodput over time per scenario, from the real runs (or the simulated ones).
+fn overload_charts(o: &OverloadResults) -> Vec<(String, String)> {
+    o.scenarios
+        .iter()
+        .map(|sc| {
+            let source = if sc.series.iter().any(|l| l.source == "real") {
+                "real"
+            } else {
+                "simulated"
+            };
+            let lines: Vec<_> = sc.series.iter().filter(|l| l.source == source).collect();
+            let mut series = Vec::new();
+            if let Some(first) = lines.first() {
+                series.push(svg::Series {
+                    name: "offered".into(),
+                    colour: "#999999",
+                    dash: "2 3",
+                    width: 1.5,
+                    points: first.points.iter().map(|p| (p.t, p.offered_rps)).collect(),
+                });
+                series.push(svg::Series {
+                    name: "best possible".into(),
+                    colour: "#1a1a1a",
+                    dash: "1 2",
+                    width: 2.0,
+                    points: first.points.iter().map(|p| (p.t, p.possible_rps)).collect(),
+                });
+            }
+            for (name, colour, dash, width) in LIMITER_STYLES {
+                if let Some(l) = lines.iter().find(|l| l.limiter == name) {
+                    series.push(svg::Series {
+                        name: format!("{name} (200s)"),
+                        colour,
+                        dash,
+                        width,
+                        points: l.points.iter().map(|p| (p.t, p.ok_rps)).collect(),
+                    });
+                }
+            }
+            (
+                overload_chart_name(&sc.name),
+                svg::lines(
+                    &series,
+                    &format!(
+                        "{}: successful answers per second ({source}, seed 1)",
+                        sc.name
+                    ),
+                    "Seconds",
+                    "Requests per second",
+                ),
+            )
+        })
+        .collect()
+}
+
+fn pareto_charts(inputs: &Inputs) -> Vec<(String, String)> {
     let Some(st) = &inputs.strategies else {
         return Vec::new();
     };
@@ -153,6 +232,9 @@ pub fn results_md(inputs: &Inputs) -> String {
             &r.machine,
         ));
     }
+    if let Some(o) = &inputs.overload {
+        md.push_str(&machine_line("Overload", &o.machine));
+    }
     if let Some(c) = &inputs.cluster {
         md.push_str(&machine_line("Cluster (inside the containers)", &c.machine));
         if let Some(host) = &c.host {
@@ -166,6 +248,7 @@ pub fn results_md(inputs: &Inputs) -> String {
         ("strategies.json", inputs.strategies.is_none()),
         ("traces.json", inputs.traces.is_none()),
         ("real_strategies.json", inputs.real_strategies.is_none()),
+        ("overload.json", inputs.overload.is_none()),
     ]
     .iter()
     .filter(|(_, missing)| *missing)
@@ -193,6 +276,9 @@ pub fn results_md(inputs: &Inputs) -> String {
     }
     if let Some(t) = &inputs.traces {
         traces_section(&mut md, t);
+    }
+    if let Some(o) = &inputs.overload {
+        overload_section(&mut md, o);
     }
 
     md.push_str("## Reproduce\n\n```bash\njust results\n```\n\n");
@@ -508,6 +594,133 @@ fn real_strategies_section(md: &mut String, r: &RealStrategyResults) {
          node and Docker networking; the simulator's is the decision wait alone (0 when a node \
          decides locally).\n\n",
     );
+}
+
+/// The real measurement of a row if there is one, else the simulated one.
+fn best_side(r: &OverloadRow) -> (&Agg, &'static str) {
+    r.real
+        .as_ref()
+        .map_or((&r.sim, "simulated"), |a| (a, "real"))
+}
+
+fn opt(a: Option<&Agg>, f: fn(&Agg) -> &Summary, d: usize) -> String {
+    a.map_or("–".into(), |a| spread(f(a), d))
+}
+
+fn overload_section(md: &mut String, o: &OverloadResults) {
+    let capacity = o.workers as u64 * 1_000 / o.service_ms.max(1);
+    let _ = write!(
+        md,
+        "## Overload: static and adaptive concurrency limits\n\n\
+         A backend with {} workers and a mean service time of {} ms (capacity {} requests/s) \
+         sits behind a server that answers `504` after {} ms. The backend does not cancel late \
+         work, so a queue that grows past the deadline turns into congestion collapse. Each \
+         limit runs on the **same requests** (arrival and service times) {} seed(s) in the \
+         simulator and {} seed(s) on the real `ConcurrencyLimitLayer` and backend (in-process \
+         through the Axum router with real Tokio timers, no network), {} s per run.\n\n\
+         - **none:** every request goes to the backend.\n\
+         - **static:** a fixed limit of {}, the healthy worker count: the best static value when \
+         it is known and never changes.\n\
+         - **aimd:** +1 per success while the limit is in use, ×0.9 per timeout (threshold: \
+         the deadline).\n\
+         - **gradient2:** shrinks when recent latency rises above 1.5× its long-term average.\n\n\
+         *Goodput* is answers `200` within the deadline, as a % of what could have succeeded: \
+         per {} ms, the smaller of the offered requests and the capacity. Capacity uses the \
+         mean service time, so a run can come out slightly above 100%. Latency is for the \
+         `200`s.\n\n",
+        o.workers,
+        o.service_ms,
+        capacity,
+        o.deadline_ms,
+        o.size.sim_seeds,
+        o.size.real_seeds,
+        o.size.run_secs,
+        o.workers,
+        o.bucket_ms
+    );
+    let mut gap: f64 = 0.0;
+    for sc in &o.scenarios {
+        let _ = write!(
+            md,
+            "### {}\n\n{}.\n\n![Goodput over time, {}](overload-{}.svg)\n\n\
+             | Limit | Goodput real % | Goodput sim % | p99 real ms | p99 sim ms | Shed real % | Timed out real % |\n\
+             |---|---:|---:|---:|---:|---:|---:|\n",
+            sc.name,
+            capitalise(&sc.description),
+            sc.name,
+            sc.name
+        );
+        for r in &sc.rows {
+            let real = r.real.as_ref();
+            if let Some(a) = real {
+                gap = gap.max((a.goodput_pct.mean - r.sim.goodput_pct.mean).abs());
+            }
+            let _ = writeln!(
+                md,
+                "| {} | {} | {} | {} | {} | {} | {} |",
+                r.limiter,
+                opt(real, |a| &a.goodput_pct, 1),
+                spread(&r.sim.goodput_pct, 1),
+                opt(real, |a| &a.p99_ms, 0),
+                spread(&r.sim.p99_ms, 0),
+                opt(real, |a| &a.shed_pct, 1),
+                opt(real, |a| &a.timeout_pct, 1)
+            );
+        }
+        if let Some(best) = sc.rows.iter().max_by(|a, b| {
+            best_side(a)
+                .0
+                .goodput_pct
+                .mean
+                .total_cmp(&best_side(b).0.goodput_pct.mean)
+        }) {
+            let (a, side) = best_side(best);
+            let _ = writeln!(
+                md,
+                "\nHighest goodput ({side}): **{}**, {:.1}% of possible with p99 {:.0} ms.",
+                best.limiter, a.goodput_pct.mean, a.p99_ms.mean
+            );
+        }
+        // The trade-off: the fastest answers may come from a limit that serves fewer.
+        if let Some(fast) = sc
+            .rows
+            .iter()
+            .filter(|r| best_side(r).0.goodput_pct.n > 0 && best_side(r).0.timeout_pct.mean == 0.0)
+            .min_by(|a, b| {
+                best_side(a)
+                    .0
+                    .p99_ms
+                    .mean
+                    .total_cmp(&best_side(b).0.p99_ms.mean)
+            })
+        {
+            let (a, side) = best_side(fast);
+            let _ = writeln!(
+                md,
+                "Lowest p99 among limits with no timeouts ({side}): **{}**, {:.0} ms at {:.1}% of \
+                 possible goodput.\n",
+                fast.limiter, a.p99_ms.mean, a.goodput_pct.mean
+            );
+        } else {
+            md.push('\n');
+        }
+    }
+    if o.scenarios
+        .iter()
+        .any(|s| s.rows.iter().any(|r| r.real.is_some()))
+    {
+        let _ = writeln!(
+            md,
+            "Largest gap in goodput between the real layer and the simulator: **{gap:.1} \
+             percentage points**.\n"
+        );
+    }
+}
+
+fn capitalise(s: &str) -> String {
+    let mut c = s.chars();
+    c.next()
+        .map_or_else(String::new, |f| f.to_uppercase().chain(c).collect())
 }
 
 fn traces_section(md: &mut String, t: &TraceResults) {
@@ -912,6 +1125,43 @@ pub fn readme_block(inputs: &Inputs) -> String {
             r.nodes, err_gap, calls_gap
         );
     }
+    if let Some(o) = &inputs.overload {
+        let find = |scenario: &str, limiter: &str| {
+            o.scenarios
+                .iter()
+                .find(|s| s.name == scenario)
+                .and_then(|s| s.rows.iter().find(|r| r.limiter == limiter))
+                .map(best_side)
+        };
+        if let (Some((none, side)), Some((stat, _)), Some((g2, _))) = (
+            find("ramp", "none"),
+            find("capacity_change", "static"),
+            find("capacity_change", "gradient2"),
+        ) {
+            let ramp_g2 = find("ramp", "gradient2").map_or(0.0, |(a, _)| a.goodput_pct.mean);
+            let capacity = o.workers as f64 * 1_000.0 / o.service_ms.max(1) as f64;
+            let peak = o
+                .scenarios
+                .iter()
+                .find(|s| s.name == "ramp")
+                .and_then(|s| s.load.last())
+                .map_or(0.0, |l| l.1 as f64 / capacity);
+            let _ = writeln!(
+                md,
+                "**Overload** ({side}, the server's own concurrency layer): with no limit, a ramp \
+                 to {peak:.0}× a backend's capacity kept {:.1}% of the possible goodput; Gradient2 kept \
+                 {:.1}%. When the backend lost half its workers and then doubled them, a static \
+                 limit tuned to the healthy backend kept {:.1}% (p99 {:.0} ms) and Gradient2 kept \
+                 {:.1}% (p99 {:.0} ms).\n",
+                none.goodput_pct.mean,
+                ramp_g2,
+                stat.goodput_pct.mean,
+                stat.p99_ms.mean,
+                g2.goodput_pct.mean,
+                g2.p99_ms.mean
+            );
+        }
+    }
     if let Some(c) = &inputs.cluster
         && let Some(uniform) = c.scenarios.iter().find(|r| r.scenario == "uniform")
     {
@@ -972,7 +1222,7 @@ mod tests {
     #[test]
     fn empty_inputs_say_nothing_was_measured() {
         let md = results_md(&Inputs::default());
-        assert!(md.contains("Not measured yet: local.json, memory.json, cluster.json, strategies.json, traces.json, real_strategies.json"));
+        assert!(md.contains("Not measured yet: local.json, memory.json, cluster.json, strategies.json, traces.json, real_strategies.json, overload.json"));
         assert!(readme_block(&Inputs::default()).contains("No results yet"));
     }
 }

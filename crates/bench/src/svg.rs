@@ -1,4 +1,5 @@
-//! The Pareto chart (store calls against admission error) as a standalone SVG.
+//! The Pareto chart (store calls against admission error) and time-series line charts
+//! as standalone SVGs.
 //!
 //! Both axes use `log10(1 + value)`, so zero calls and zero error sit on the axes and
 //! the interesting region near the origin is not squashed. Each strategy has its own
@@ -190,6 +191,129 @@ pub fn pareto(points: &[Point], title: &str) -> String {
     svg
 }
 
+/// One line of a [`lines`] chart.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Series {
+    /// Legend label.
+    pub name: String,
+    /// Stroke colour.
+    pub colour: &'static str,
+    /// SVG `stroke-dasharray` (empty for solid), so lines differ without colour.
+    pub dash: &'static str,
+    /// Stroke width.
+    pub width: f64,
+    /// `(x, y)` points in order.
+    pub points: Vec<(f64, f64)>,
+}
+
+/// A line chart from zero on both axes. Each line has a tooltip and a legend entry.
+pub fn lines(series: &[Series], title: &str, x_label: &str, y_label: &str) -> String {
+    let plot_w = W - LEFT - RIGHT;
+    let plot_h = H - TOP - BOTTOM;
+    let all = || series.iter().flat_map(|s| s.points.iter());
+    let x_max = all().map(|p| p.0).fold(0.0, f64::max).max(1e-9);
+    let y_max = nice(all().map(|p| p.1).fold(0.0, f64::max));
+    let px = |x: f64| LEFT + x / x_max * plot_w;
+    let py = |y: f64| TOP + plot_h - y / y_max * plot_h;
+    let mut svg = String::new();
+    let _ = write!(
+        svg,
+        r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" font-family="Inter, system-ui, sans-serif" font-size="13" role="img" aria-label="{t}">
+<rect width="{W}" height="{H}" fill="#ffffff"/>
+<text x="{LEFT}" y="28" font-size="15" font-weight="600" fill="#1a1a1a">{t}</text>
+"##,
+        t = escape(title)
+    );
+    for i in 0..=4 {
+        let v = y_max * f64::from(i) / 4.0;
+        let y = py(v);
+        let _ = writeln!(
+            svg,
+            r##"<line x1="{LEFT}" x2="{:.1}" y1="{y:.1}" y2="{y:.1}" stroke="#e5e5e5"/><text x="{:.1}" y="{:.1}" text-anchor="end" fill="#555">{v:.0}</text>"##,
+            LEFT + plot_w,
+            LEFT - 8.0,
+            y + 4.0
+        );
+    }
+    let x_step = if x_max > 20.0 { 5.0 } else { 2.0 };
+    let mut x = 0.0;
+    while x <= x_max + 1e-9 {
+        let _ = writeln!(
+            svg,
+            r##"<text x="{:.1}" y="{:.1}" text-anchor="middle" fill="#555">{x:.0}</text>"##,
+            px(x),
+            TOP + plot_h + 18.0
+        );
+        x += x_step;
+    }
+    let _ = write!(
+        svg,
+        r##"<rect x="{LEFT}" y="{TOP}" width="{plot_w}" height="{plot_h}" fill="none" stroke="#999"/>
+<text x="{:.1}" y="{:.1}" text-anchor="middle" fill="#1a1a1a">{}</text>
+<text transform="translate(18 {:.1}) rotate(-90)" text-anchor="middle" fill="#1a1a1a">{}</text>
+"##,
+        LEFT + plot_w / 2.0,
+        H - 18.0,
+        escape(x_label),
+        TOP + plot_h / 2.0,
+        escape(y_label)
+    );
+    for s in series {
+        let d: Vec<String> = s
+            .points
+            .iter()
+            .map(|&(x, y)| format!("{:.1},{:.1}", px(x), py(y)))
+            .collect();
+        let dash = if s.dash.is_empty() {
+            String::new()
+        } else {
+            format!(r#" stroke-dasharray="{}""#, s.dash)
+        };
+        let _ = writeln!(
+            svg,
+            r#"<g><title>{}</title><polyline points="{}" fill="none" stroke="{}" stroke-width="{}"{dash} stroke-linejoin="round"/></g>"#,
+            escape(&s.name),
+            d.join(" "),
+            s.colour,
+            s.width
+        );
+    }
+    let lx = LEFT + plot_w + 20.0;
+    for (i, s) in series.iter().enumerate() {
+        let y = TOP + 10.0 + i as f64 * 24.0;
+        let dash = if s.dash.is_empty() {
+            String::new()
+        } else {
+            format!(r#" stroke-dasharray="{}""#, s.dash)
+        };
+        let _ = writeln!(
+            svg,
+            r##"<line x1="{lx:.1}" x2="{:.1}" y1="{y:.1}" y2="{y:.1}" stroke="{}" stroke-width="{}"{dash}/><text x="{:.1}" y="{:.1}" fill="#1a1a1a">{}</text>"##,
+            lx + 28.0,
+            s.colour,
+            s.width,
+            lx + 36.0,
+            y + 4.0,
+            escape(&s.name)
+        );
+    }
+    svg.push_str("</svg>\n");
+    svg
+}
+
+/// A round axis maximum at or above `v`: 1, 1.5, 2, 2.5, 3, 4, 5, 6 or 8 times a power of ten.
+fn nice(v: f64) -> f64 {
+    if v <= 0.0 {
+        return 1.0;
+    }
+    let p = 10f64.powf(v.log10().floor());
+    [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0]
+        .iter()
+        .map(|m| m * p)
+        .find(|&c| c >= v)
+        .unwrap_or(10.0 * p)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -217,6 +341,38 @@ mod tests {
         assert_eq!(svg.matches("<g><title>").count(), 2);
         assert!(svg.contains("s&lt;1&gt;"));
         assert!(svg.contains("Test &amp; chart"));
+    }
+
+    #[test]
+    fn line_charts_draw_every_series_with_a_legend() {
+        let svg = lines(
+            &[
+                Series {
+                    name: "a & b".into(),
+                    colour: "#000",
+                    dash: "",
+                    width: 2.0,
+                    points: vec![(0.0, 0.0), (1.0, 340.0)],
+                },
+                Series {
+                    name: "c".into(),
+                    colour: "#111",
+                    dash: "4 2",
+                    width: 1.0,
+                    points: vec![(0.0, 10.0), (1.0, 20.0)],
+                },
+            ],
+            "T",
+            "x",
+            "y",
+        );
+        assert_eq!(svg.matches("<polyline").count(), 2);
+        assert!(svg.contains("a &amp; b"));
+        assert!(svg.contains(r#"stroke-dasharray="4 2""#));
+        assert_eq!(nice(340.0), 400.0);
+        assert_eq!(nice(2_350.0), 2_500.0);
+        assert_eq!(nice(0.0), 1.0);
+        assert_eq!(nice(2_000.0), 2_000.0);
     }
 
     #[test]
