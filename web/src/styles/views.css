@@ -656,3 +656,40 @@ td.over {
 .replay-page {
   padding-bottom: var(--s-8);
 }
+
+/* ---------- Results ---------- */
+
+.results-title {
+  font-size: var(--step-3);
+}
+
+.bar-cell {
+  position: relative;
+  min-width: 110px;
+}
+
+.bar-cell .bar {
+  position: absolute;
+  left: 0;
+  top: 22%;
+  bottom: 22%;
+  background: var(--accent-soft);
+  border-radius: 0 3px 3px 0;
+}
+
+.bar-cell.warn .bar {
+  background: var(--blocked-soft);
+}
+
+.bar-cell.warn .bar-text {
+  color: var(--blocked);
+  font-weight: 700;
+}
+
+.bar-cell .bar-text {
+  position: relative;
+}
+
+.section .stack > .table-wrap + .table-wrap {
+  margin-top: var(--s-5);
+}
