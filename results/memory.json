@@ -7,8 +7,8 @@
     "arch": "aarch64",
     "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
     "profile": "release",
-    "git_commit": "d47ebdde8de9",
-    "measured_at": "2026-11-20T07:06:41Z"
+    "git_commit": "4076abe200b4",
+    "measured_at": "2026-11-20T10:54:47Z"
   },
   "rows": [
     {

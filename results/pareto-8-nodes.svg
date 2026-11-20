@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 480" width="760" height="480" font-family="Inter, Helvetica, Arial, sans-serif" font-size="12" role="img" aria-labelledby="t d">
+<title id="t">8 nodes: store calls vs admission error, every traffic pattern</title>
+<desc id="d">Each point is one coordination strategy on one traffic pattern. Lower left is better: fewer store calls and less admission error.</desc>
+<rect width="760" height="480" fill="#ffffff"/>
+<text x="70" y="28" font-size="15" font-weight="600" fill="#1a1a1a">8 nodes: store calls vs admission error, every traffic pattern</text>
+<line x1="70.0" y1="50" x2="70.0" y2="420.0" stroke="#e5e5e5"/><text x="70.0" y="438.0" text-anchor="middle" fill="#444">0</text>
+<line x1="119.2" y1="50" x2="119.2" y2="420.0" stroke="#e5e5e5"/><text x="119.2" y="438.0" text-anchor="middle" fill="#444">1</text>
+<line x1="240.1" y1="50" x2="240.1" y2="420.0" stroke="#e5e5e5"/><text x="240.1" y="438.0" text-anchor="middle" fill="#444">10</text>
+<line x1="397.3" y1="50" x2="397.3" y2="420.0" stroke="#e5e5e5"/><text x="397.3" y="438.0" text-anchor="middle" fill="#444">100</text>
+<line x1="560.0" y1="50" x2="560.0" y2="420.0" stroke="#e5e5e5"/><text x="560.0" y="438.0" text-anchor="middle" fill="#444">1000</text>
+<line x1="70" y1="420.0" x2="560.0" y2="420.0" stroke="#e5e5e5"/><text x="62.0" y="424.0" text-anchor="end" fill="#444">0%</text>
+<line x1="70" y1="388.2" x2="560.0" y2="388.2" stroke="#e5e5e5"/><text x="62.0" y="392.2" text-anchor="end" fill="#444">0.5%</text>
+<line x1="70" y1="365.7" x2="560.0" y2="365.7" stroke="#e5e5e5"/><text x="62.0" y="369.7" text-anchor="end" fill="#444">1%</text>
+<line x1="70" y1="334.0" x2="560.0" y2="334.0" stroke="#e5e5e5"/><text x="62.0" y="338.0" text-anchor="end" fill="#444">2%</text>
+<line x1="70" y1="279.7" x2="560.0" y2="279.7" stroke="#e5e5e5"/><text x="62.0" y="283.7" text-anchor="end" fill="#444">5%</text>
+<line x1="70" y1="232.2" x2="560.0" y2="232.2" stroke="#e5e5e5"/><text x="62.0" y="236.2" text-anchor="end" fill="#444">10%</text>
+<line x1="70" y1="181.5" x2="560.0" y2="181.5" stroke="#e5e5e5"/><text x="62.0" y="185.5" text-anchor="end" fill="#444">20%</text>
+<line x1="70" y1="112.0" x2="560.0" y2="112.0" stroke="#e5e5e5"/><text x="62.0" y="116.0" text-anchor="end" fill="#444">50%</text>
+<line x1="70" y1="58.5" x2="560.0" y2="58.5" stroke="#e5e5e5"/><text x="62.0" y="62.5" text-anchor="end" fill="#444">100%</text>
+<rect x="70" y="50" width="490" height="370" fill="none" stroke="#999"/>
+<text x="315.0" y="462.0" text-anchor="middle" fill="#1a1a1a">Store calls per 1,000 decisions (log scale)</text>
+<text transform="translate(18 235.0) rotate(-90)" text-anchor="middle" fill="#1a1a1a">Admission error, % (log scale)</text>
+<g><title>central_exact · steady_poisson: 1000 calls per 1k, 0.01% error</title><circle cx="560.0" cy="419.4" r="6.0" fill="#0072B2"/></g>
+<g><title>local_split · steady_poisson: 0 calls per 1k, 2.83% error</title><rect x="64.9" y="309.7" width="10.2" height="10.2" fill="#E69F00"/></g>
+<g><title>async_sync · steady_poisson: 542 calls per 1k, 10.02% error</title><polygon points="516.6,226.1 510.6,236.9 522.6,236.9" fill="#CC79A7"/></g>
+<g><title>fixed_leasing · steady_poisson: 674 calls per 1k, 1.13% error</title><polygon points="532.0,354.6 538.0,360.6 532.0,366.6 526.0,360.6" fill="#009E73"/></g>
+<g><title>adaptive_leasing · steady_poisson: 701 calls per 1k, 1.21% error</title><path d="M528.8,351.8L540.8,363.8M528.8,363.8L540.8,351.8" stroke="#D55E00" stroke-width="3"/></g>
+<g><title>central_exact · skewed: 1000 calls per 1k, 0.01% error</title><circle cx="560.0" cy="419.4" r="6.0" fill="#0072B2"/></g>
+<g><title>local_split · skewed: 0 calls per 1k, 49.52% error</title><rect x="64.9" y="107.7" width="10.2" height="10.2" fill="#E69F00"/></g>
+<g><title>async_sync · skewed: 400 calls per 1k, 2.48% error</title><polygon points="495.1,316.2 489.1,327.0 501.1,327.0" fill="#CC79A7"/></g>
+<g><title>fixed_leasing · skewed: 422 calls per 1k, 1.96% error</title><polygon points="498.8,328.9 504.8,334.9 498.8,340.9 492.8,334.9" fill="#009E73"/></g>
+<g><title>adaptive_leasing · skewed: 314 calls per 1k, 2.38% error</title><path d="M472.1,318.6L484.1,330.6M472.1,330.6L484.1,318.6" stroke="#D55E00" stroke-width="3"/></g>
+<g><title>central_exact · on_off: 1000 calls per 1k, 0.00% error</title><circle cx="560.0" cy="420.0" r="6.0" fill="#0072B2"/></g>
+<g><title>local_split · on_off: 0 calls per 1k, 3.88% error</title><rect x="64.9" y="290.8" width="10.2" height="10.2" fill="#E69F00"/></g>
+<g><title>async_sync · on_off: 457 calls per 1k, 9.46% error</title><polygon points="504.6,230.1 498.6,240.9 510.6,240.9" fill="#CC79A7"/></g>
+<g><title>fixed_leasing · on_off: 491 calls per 1k, 0.17% error</title><polygon points="509.6,401.4 515.6,407.4 509.6,413.4 503.6,407.4" fill="#009E73"/></g>
+<g><title>adaptive_leasing · on_off: 369 calls per 1k, 0.28% error</title><path d="M483.4,394.8L495.4,406.8M483.4,406.8L495.4,394.8" stroke="#D55E00" stroke-width="3"/></g>
+<g><title>central_exact · heavy_tailed: 1000 calls per 1k, 0.02% error</title><circle cx="560.0" cy="418.8" r="6.0" fill="#0072B2"/></g>
+<g><title>local_split · heavy_tailed: 0 calls per 1k, 2.91% error</title><rect x="64.9" y="308.1" width="10.2" height="10.2" fill="#E69F00"/></g>
+<g><title>async_sync · heavy_tailed: 540 calls per 1k, 9.97% error</title><polygon points="516.3,226.4 510.3,237.2 522.3,237.2" fill="#CC79A7"/></g>
+<g><title>fixed_leasing · heavy_tailed: 669 calls per 1k, 1.17% error</title><polygon points="531.5,353.2 537.5,359.2 531.5,365.2 525.5,359.2" fill="#009E73"/></g>
+<g><title>adaptive_leasing · heavy_tailed: 697 calls per 1k, 1.22% error</title><path d="M528.4,351.6L540.4,363.6M528.4,363.6L540.4,351.6" stroke="#D55E00" stroke-width="3"/></g>
+<g><title>central_exact · diurnal: 1000 calls per 1k, 0.02% error</title><circle cx="560.0" cy="418.6" r="6.0" fill="#0072B2"/></g>
+<g><title>local_split · diurnal: 0 calls per 1k, 3.40% error</title><rect x="64.9" y="298.8" width="10.2" height="10.2" fill="#E69F00"/></g>
+<g><title>async_sync · diurnal: 470 calls per 1k, 12.14% error</title><polygon points="506.5,212.3 500.5,223.1 512.5,223.1" fill="#CC79A7"/></g>
+<g><title>fixed_leasing · diurnal: 592 calls per 1k, 1.10% error</title><polygon points="522.9,355.9 528.9,361.9 522.9,367.9 516.9,361.9" fill="#009E73"/></g>
+<g><title>adaptive_leasing · diurnal: 605 calls per 1k, 1.00% error</title><path d="M518.4,359.7L530.4,371.7M518.4,371.7L530.4,359.7" stroke="#D55E00" stroke-width="3"/></g>
+<g><title>central_exact · flash_crowd: 1000 calls per 1k, 0.00% error</title><circle cx="560.0" cy="420.0" r="6.0" fill="#0072B2"/></g>
+<g><title>local_split · flash_crowd: 0 calls per 1k, 2.20% error</title><rect x="64.9" y="323.9" width="10.2" height="10.2" fill="#E69F00"/></g>
+<g><title>async_sync · flash_crowd: 940 calls per 1k, 0.00% error</title><polygon points="555.6,414.0 549.6,424.8 561.6,424.8" fill="#CC79A7"/></g>
+<g><title>fixed_leasing · flash_crowd: 337 calls per 1k, 0.00% error</title><polygon points="482.9,413.9 488.9,419.9 482.9,425.9 476.9,419.9" fill="#009E73"/></g>
+<g><title>adaptive_leasing · flash_crowd: 354 calls per 1k, 0.01% error</title><path d="M480.5,413.5L492.5,425.5M480.5,425.5L492.5,413.5" stroke="#D55E00" stroke-width="3"/></g>
+<g><title>central_exact · boundary_attack: 1000 calls per 1k, 0.00% error</title><circle cx="560.0" cy="420.0" r="6.0" fill="#0072B2"/></g>
+<g><title>local_split · boundary_attack: 0 calls per 1k, 21.20% error</title><rect x="64.9" y="172.1" width="10.2" height="10.2" fill="#E69F00"/></g>
+<g><title>async_sync · boundary_attack: 80 calls per 1k, 111.60% error</title><polygon points="381.7,44.0 375.7,54.8 387.7,54.8" fill="#CC79A7"/></g>
+<g><title>fixed_leasing · boundary_attack: 120 calls per 1k, 0.40% error</title><polygon points="410.1,387.6 416.1,393.6 410.1,399.6 404.1,393.6" fill="#009E73"/></g>
+<g><title>adaptive_leasing · boundary_attack: 120 calls per 1k, 0.00% error</title><path d="M404.1,414.0L416.1,426.0M404.1,426.0L416.1,414.0" stroke="#D55E00" stroke-width="3"/></g>
+<circle cx="586.0" cy="60.0" r="6.0" fill="#0072B2"/><text x="598.0" y="64.0" fill="#1a1a1a">central_exact</text>
+<rect x="580.9" y="78.9" width="10.2" height="10.2" fill="#E69F00"/><text x="598.0" y="88.0" fill="#1a1a1a">local_split</text>
+<polygon points="586.0,102.0 580.0,112.8 592.0,112.8" fill="#CC79A7"/><text x="598.0" y="112.0" fill="#1a1a1a">async_sync</text>
+<polygon points="586.0,126.0 592.0,132.0 586.0,138.0 580.0,132.0" fill="#009E73"/><text x="598.0" y="136.0" fill="#1a1a1a">fixed_leasing</text>
+<path d="M580.0,150.0L592.0,162.0M580.0,162.0L592.0,150.0" stroke="#D55E00" stroke-width="3"/><text x="598.0" y="160.0" fill="#1a1a1a">adaptive_leasing</text>
+<text x="580.0" y="186.0" fill="#666" font-size="11">Lower left is better.</text>
+</svg>
