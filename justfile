@@ -21,7 +21,7 @@ test-docker:
 
 # Reproduce every number in results/RESULTS.md and the README (needs Docker).
 # Downloads and containers are removed as each step finishes; only results/ is kept.
-results: bench traces overload llm cluster cluster-strategies report
+results: bench traces overload llm cluster cluster-strategies report story
 
 # A public request log (downloaded into memory, never saved) through every algorithm
 # and strategy: results/traces.json.
@@ -81,6 +81,12 @@ release-check:
 # Install the ratelab command from this checkout.
 cli:
     cargo install --path crates/cli --locked
+
+# The report and the private story drafts, every number filled in from results/:
+# docs/report/*.md and its PDF, and target/story/*.md (not committed).
+story:
+    cargo run -p bench --release -- story
+    node web/scripts/report-pdf.mjs
 
 # Free the rebuildable caches: Rust build output and Docker's build cache (all of it).
 clean:
