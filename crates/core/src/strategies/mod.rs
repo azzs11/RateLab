@@ -14,16 +14,20 @@
 //! | [`CentralExact`] | one round trip per request | exact, but every request waits for the store |
 //! | [`LocalSplit`] | none | each node gets `limit / N`; wrong when traffic is uneven |
 //! | [`AsyncSync`] | one sync per active key per interval per node | no waiting; over-admits between syncs |
+//! | [`FixedLeasing`] | one lease per `chunk` tokens | exact budget; leftovers expire unused |
+//! | [`AdaptiveLeasing`] | leases sized by demand, idle leftovers returned | fewer calls when busy, less hoarding when idle |
 
 mod async_sync;
 mod bucket;
 mod central;
+mod leasing;
 mod local_split;
 mod store;
 
 pub use async_sync::AsyncSync;
 pub use bucket::ShareBucket;
 pub use central::CentralExact;
+pub use leasing::{AdaptiveLeasing, AdaptiveParams, FixedLeasing};
 pub use local_split::LocalSplit;
 pub use store::Store;
 
@@ -158,6 +162,15 @@ pub enum Strategy {
         /// Time between syncs.
         interval: Duration,
     },
+    /// [`FixedLeasing`] with leases of `chunk` tokens that expire after `ttl`.
+    FixedLeasing {
+        /// Tokens per lease.
+        chunk: u64,
+        /// Lease lifetime.
+        ttl: Duration,
+    },
+    /// [`AdaptiveLeasing`].
+    AdaptiveLeasing(AdaptiveParams),
 }
 
 impl Strategy {
@@ -173,6 +186,8 @@ impl Strategy {
             Strategy::CentralExact { node_clock: true } => "central_exact_node_clock",
             Strategy::LocalSplit => "local_split",
             Strategy::AsyncSync { .. } => "async_sync",
+            Strategy::FixedLeasing { .. } => "fixed_leasing",
+            Strategy::AdaptiveLeasing(_) => "adaptive_leasing",
         }
     }
 
@@ -207,6 +222,12 @@ impl Strategy {
             }
             Strategy::LocalSplit => Box::new(LocalSplit::new(config, nodes)),
             Strategy::AsyncSync { interval } => Box::new(AsyncSync::new(config, nodes, interval)),
+            Strategy::FixedLeasing { chunk, ttl } => {
+                Box::new(FixedLeasing::new(config, chunk, ttl, policy))
+            }
+            Strategy::AdaptiveLeasing(params) => {
+                Box::new(AdaptiveLeasing::new(config, params, policy))
+            }
         }
     }
 }
