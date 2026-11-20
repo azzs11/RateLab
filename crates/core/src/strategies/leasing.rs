@@ -478,7 +478,8 @@ mod tests {
         }
         let denied = out.decisions[2].1;
         assert!(!denied.allowed);
-        assert_eq!(denied.retry_after, Some(Duration::from_millis(500)));
+        // Waits until a whole lease of 2 is back: 2 tokens at 2 per second.
+        assert_eq!(denied.retry_after, Some(Duration::from_secs(1)));
         out.clear();
         // Within the backoff: denied locally, no store traffic.
         node.on_request(Nanos(100), 3, "k", Cost::ONE, &mut out);

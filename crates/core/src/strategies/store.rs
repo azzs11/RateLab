@@ -70,10 +70,15 @@ impl Store {
                 StoreReply::Checked(bucket.decision(allowed, cost.0))
             }
             StoreOp::Lease { want } => {
+                let config = self.config;
                 let bucket = self.bucket(key, now);
                 let granted = bucket.take_up_to(want);
+                // Nothing to give: say when the whole lease will be there, so the node
+                // does not come back for one token at a time.
                 let retry_after = if granted == 0 {
-                    bucket.time_until(1)
+                    bucket
+                        .time_until(want)
+                        .or_else(|| bucket.time_until(bucket_capacity_tokens(config)))
                 } else {
                     None
                 };
@@ -100,6 +105,11 @@ impl Store {
     pub fn tokens(&mut self, now: Nanos, key: &str) -> u64 {
         self.bucket(key, now).tokens()
     }
+}
+
+/// The most tokens one bucket can hold.
+fn bucket_capacity_tokens(config: RateLimitConfig) -> u64 {
+    config.limit()
 }
 
 #[cfg(test)]
@@ -170,7 +180,7 @@ mod tests {
             lease(&mut s, 8),
             StoreReply::Leased {
                 granted: 0,
-                retry_after: Some(Duration::from_millis(100))
+                retry_after: Some(Duration::from_millis(800))
             }
         );
     }

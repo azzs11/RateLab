@@ -76,11 +76,12 @@ pub enum StoreReply {
     /// Answer to [`StoreOp::Check`].
     Checked(Decision),
     /// Answer to [`StoreOp::Lease`]. When nothing was granted, `retry_after` is the
-    /// time until one token is available.
+    /// time until the whole lease (or, if larger than the limit, a full bucket) is
+    /// available.
     Leased {
         /// Tokens granted (possibly fewer than wanted, possibly zero).
         granted: u64,
-        /// Time until a token is available, when none was granted.
+        /// When none was granted: time until the wanted tokens are available.
         retry_after: Option<Duration>,
     },
     /// Answer to [`StoreOp::Return`].
