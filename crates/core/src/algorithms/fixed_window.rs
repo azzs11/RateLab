@@ -1,63 +1,104 @@
-use crate::{RateLimitConfig, RateLimiter, Result};
-use std::collections::HashMap;
-use std::time::Instant;
+//! Fixed window: time is cut into back-to-back windows of length `window` (aligned to
+//! the clock origin); each key may spend `limit` units per window.
+
+use super::with_state;
+use crate::{Clock, Cost, Decision, RateLimitConfig, RateLimiter, Tokens};
+use dashmap::DashMap;
+use std::time::Duration;
 
 #[derive(Debug)]
-struct WindowState {
-    count: u64,
-    window_start: Instant,
+struct Window {
+    index: u64,
+    used: u64,
 }
 
-/// Fixed Window algorithm implementation
-/// Counts requests in fixed time windows
-/// Simple but can have burst issues at window boundaries
-pub struct FixedWindow {
-    config: RateLimitConfig,
-    windows: HashMap<String, WindowState>,
+/// Fixed window counter.
+///
+/// The cheapest algorithm: one counter per key. Its known weakness is the window
+/// boundary: a client can spend `limit` at the end of one window and `limit` again at
+/// the start of the next, so a short span can admit up to `2 × limit`.
+///
+/// ```
+/// use drl_core::{Cost, FixedWindow, ManualClock, RateLimitConfig, RateLimiter};
+/// use std::time::Duration;
+///
+/// let clock = ManualClock::new();
+/// let limiter = FixedWindow::with_clock(RateLimitConfig::per_second(3)?, &clock);
+/// assert!(limiter.check("k", Cost(3)).allowed);
+/// assert!(!limiter.check("k", Cost::ONE).allowed);
+///
+/// clock.advance(Duration::from_secs(1)); // next window
+/// assert!(limiter.check("k", Cost(3)).allowed);
+/// # Ok::<(), drl_core::ConfigError>(())
+/// ```
+#[derive(Debug)]
+pub struct FixedWindow<C> {
+    limit: u64,
+    window: u64,
+    clock: C,
+    windows: DashMap<String, Window>,
 }
 
-impl FixedWindow {
-    pub fn new(config: RateLimitConfig) -> Self {
+impl<C: Clock> FixedWindow<C> {
+    /// A fixed window limiter that reads time from `clock`.
+    pub fn with_clock(config: RateLimitConfig, clock: C) -> Self {
         Self {
-            config,
-            windows: HashMap::new(),
+            limit: config.limit(),
+            window: config.window_nanos(),
+            clock,
+            windows: DashMap::new(),
         }
-    }
-
-    fn check_window(&mut self, key: &str) -> &mut WindowState {
-        let now = Instant::now();
-
-        let window = self.windows.entry(key.to_string()).or_insert(WindowState {
-            count: 0,
-            window_start: now,
-        });
-
-        // Check if window has expired
-        let elapsed = now.duration_since(window.window_start);
-        if elapsed >= self.config.window {
-            // Reset window
-            window.count = 0;
-            window.window_start = now;
-        }
-
-        window
     }
 }
 
-impl RateLimiter for FixedWindow {
-    fn allow_request(&mut self, key: &str) -> Result<bool> {
-        let max_requests = self.config.max_requests;
-        let window = self.check_window(key);
+#[cfg(feature = "std-clock")]
+impl FixedWindow<crate::MonotonicClock> {
+    /// A fixed window limiter on the real monotonic clock.
+    pub fn new(config: RateLimitConfig) -> Self {
+        Self::with_clock(config, crate::MonotonicClock::new())
+    }
+}
 
-        if window.count < max_requests {
-            window.count += 1;
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+impl<C: Clock> RateLimiter for FixedWindow<C> {
+    fn check(&self, key: &str, cost: Cost) -> Decision {
+        let now = self.clock.now().0;
+        let index = now / self.window;
+        let window_end = (u128::from(index) + 1) * u128::from(self.window);
+        let until_next =
+            Duration::from_nanos(u64::try_from(window_end - u128::from(now)).unwrap_or(u64::MAX));
+
+        with_state(
+            &self.windows,
+            key,
+            || Window { index, used: 0 },
+            |w| {
+                if w.index != index {
+                    w.index = index;
+                    w.used = 0;
+                }
+
+                let allowed = w.used.saturating_add(cost.0) <= self.limit;
+                if allowed {
+                    w.used += cost.0;
+                }
+                let remaining = Tokens(self.limit - w.used);
+                let reset_after = if w.used == 0 {
+                    Duration::ZERO
+                } else {
+                    until_next
+                };
+
+                if allowed {
+                    Decision::allow(remaining, reset_after)
+                } else {
+                    let retry_after = (cost.0 <= self.limit).then_some(until_next);
+                    Decision::deny(remaining, reset_after, retry_after)
+                }
+            },
+        )
     }
 
-    fn reset(&mut self, key: &str) {
+    fn reset(&self, key: &str) {
         self.windows.remove(key);
     }
 }
@@ -65,38 +106,41 @@ impl RateLimiter for FixedWindow {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::thread::sleep;
-    use std::time::Duration;
+    use crate::{ManualClock, Nanos};
 
     #[test]
-    fn test_fixed_window_allows_requests() {
-        let config = RateLimitConfig::per_second(5);
-        let mut limiter = FixedWindow::new(config);
-
-        // Should allow 5 requests
+    fn allows_limit_per_window() {
+        let clock = ManualClock::new();
+        let l = FixedWindow::with_clock(RateLimitConfig::per_second(5).unwrap(), &clock);
         for _ in 0..5 {
-            assert!(limiter.allow_request("user1").unwrap());
+            assert!(l.check("user1", Cost::ONE).allowed);
         }
-
-        // 6th should be denied
-        assert!(!limiter.allow_request("user1").unwrap());
+        assert!(!l.check("user1", Cost::ONE).allowed);
     }
 
     #[test]
-    fn test_fixed_window_resets() {
-        let config = RateLimitConfig::new(3, Duration::from_millis(500));
-        let mut limiter = FixedWindow::new(config);
-
-        // Use up window
+    fn resets_at_the_next_window() {
+        let clock = ManualClock::new();
+        let config = RateLimitConfig::new(3, Duration::from_millis(500)).unwrap();
+        let l = FixedWindow::with_clock(config, &clock);
         for _ in 0..3 {
-            assert!(limiter.allow_request("user1").unwrap());
+            assert!(l.check("user1", Cost::ONE).allowed);
         }
-        assert!(!limiter.allow_request("user1").unwrap());
+        let d = l.check("user1", Cost::ONE);
+        assert!(!d.allowed);
+        assert_eq!(d.retry_after, Some(Duration::from_millis(500)));
 
-        // Wait for window to expire
-        sleep(Duration::from_millis(600));
+        clock.advance(Duration::from_millis(500));
+        assert!(l.check("user1", Cost::ONE).allowed);
+    }
 
-        // Should have new window
-        assert!(limiter.allow_request("user1").unwrap());
+    #[test]
+    fn boundary_burst_admits_twice_the_limit() {
+        // Documents the known weakness rather than hiding it.
+        let clock = ManualClock::starting_at(Nanos(999_000_000));
+        let l = FixedWindow::with_clock(RateLimitConfig::per_second(10).unwrap(), &clock);
+        assert!(l.check("k", Cost(10)).allowed);
+        clock.advance(Duration::from_millis(2)); // crosses into the next window
+        assert!(l.check("k", Cost(10)).allowed);
     }
 }

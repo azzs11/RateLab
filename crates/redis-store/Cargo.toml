@@ -8,5 +8,5 @@ repository.workspace = true
 
 [dependencies]
 drl-core.workspace = true
-anyhow.workspace = true
+thiserror.workspace = true
 redis = { version = "0.24", features = ["tokio-comp", "script"] }

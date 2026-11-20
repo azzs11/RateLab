@@ -11,5 +11,4 @@ repository = "https://github.com/azzs11/distributed-rate-limiter"
 [workspace.dependencies]
 drl-core = { path = "crates/core" }
 drl-redis-store = { path = "crates/redis-store" }
-anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "2.0"

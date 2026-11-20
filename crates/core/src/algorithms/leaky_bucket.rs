@@ -1,69 +1,102 @@
-use crate::{RateLimitConfig, RateLimiter, Result};
-use std::collections::HashMap;
-use std::time::Instant;
+//! Leaky bucket (as a meter): each request pours `cost` units into a bucket of size
+//! `limit` that drains continuously at `limit` per `window`. A request that would
+//! overflow the bucket is rejected.
 
+use super::{ceil_div_nanos, sat_u64, with_state};
+use crate::{Clock, Cost, Decision, RateLimitConfig, RateLimiter, Tokens};
+use dashmap::DashMap;
+
+/// Per-key state. Water is scaled by `window_nanos` so draining is exact in integers:
+/// one nanosecond drains `limit` scaled units.
 #[derive(Debug)]
-struct BucketState {
-    water_level: f64, // Current "water" in bucket
-    last_update: Instant,
+struct Bucket {
+    water: u128,
+    last: u64,
 }
 
-/// Leaky Bucket algorithm implementation
-/// Water (requests) fills a bucket that leaks at a constant rate
-/// If bucket overflows, requests are denied
-pub struct LeakyBucket {
-    buckets: HashMap<String, BucketState>,
-    leak_rate: f64, // water units leaked per second
-    max_capacity: f64,
+/// Leaky bucket limiter (meter form).
+///
+/// Starts empty, so it admits a burst of up to `limit` units, then admits work only as
+/// fast as the bucket drains.
+///
+/// ```
+/// use drl_core::{Cost, LeakyBucket, ManualClock, RateLimitConfig, RateLimiter};
+/// use std::time::Duration;
+///
+/// let clock = ManualClock::new();
+/// let limiter = LeakyBucket::with_clock(RateLimitConfig::per_second(2)?, &clock);
+/// assert!(limiter.check("k", Cost(2)).allowed);
+/// assert!(!limiter.check("k", Cost::ONE).allowed);
+///
+/// clock.advance(Duration::from_millis(500)); // half a window drains one unit
+/// assert!(limiter.check("k", Cost::ONE).allowed);
+/// # Ok::<(), drl_core::ConfigError>(())
+/// ```
+#[derive(Debug)]
+pub struct LeakyBucket<C> {
+    limit: u128,
+    window: u128,
+    clock: C,
+    buckets: DashMap<String, Bucket>,
 }
 
-impl LeakyBucket {
-    pub fn new(config: RateLimitConfig) -> Self {
-        let leak_rate = config.max_requests as f64 / config.window.as_secs_f64();
-        let max_capacity = config.max_requests as f64;
-
+impl<C: Clock> LeakyBucket<C> {
+    /// A leaky bucket that reads time from `clock`.
+    pub fn with_clock(config: RateLimitConfig, clock: C) -> Self {
         Self {
-            buckets: HashMap::new(),
-            leak_rate,
-            max_capacity,
+            limit: u128::from(config.limit()),
+            window: u128::from(config.window_nanos()),
+            clock,
+            buckets: DashMap::new(),
         }
-    }
-
-    fn update_bucket(&mut self, key: &str) -> &mut BucketState {
-        let now = Instant::now();
-
-        let bucket = self.buckets.entry(key.to_string()).or_insert(BucketState {
-            water_level: 0.0, // Start empty
-            last_update: now,
-        });
-
-        // Calculate how much has leaked since last check
-        let elapsed = now.duration_since(bucket.last_update).as_secs_f64();
-        let leaked = elapsed * self.leak_rate;
-
-        // Reduce water level by leaked amount (but not below 0)
-        bucket.water_level = (bucket.water_level - leaked).max(0.0);
-        bucket.last_update = now;
-
-        bucket
     }
 }
 
-impl RateLimiter for LeakyBucket {
-    fn allow_request(&mut self, key: &str) -> Result<bool> {
-        let max_capacity = self.max_capacity;
-        let bucket = self.update_bucket(key);
+#[cfg(feature = "std-clock")]
+impl LeakyBucket<crate::MonotonicClock> {
+    /// A leaky bucket on the real monotonic clock.
+    pub fn new(config: RateLimitConfig) -> Self {
+        Self::with_clock(config, crate::MonotonicClock::new())
+    }
+}
 
-        // Check if adding 1 unit of water would overflow
-        if bucket.water_level + 1.0 <= max_capacity {
-            bucket.water_level += 1.0;
-            Ok(true)
-        } else {
-            Ok(false) // Bucket would overflow
-        }
+impl<C: Clock> RateLimiter for LeakyBucket<C> {
+    fn check(&self, key: &str, cost: Cost) -> Decision {
+        let now = self.clock.now().0;
+        let capacity = self.limit * self.window;
+        let need = u128::from(cost.0) * self.window;
+
+        with_state(
+            &self.buckets,
+            key,
+            || Bucket {
+                water: 0,
+                last: now,
+            },
+            |b| {
+                let elapsed = u128::from(now.saturating_sub(b.last));
+                b.water = b.water.saturating_sub(elapsed.saturating_mul(self.limit));
+                b.last = b.last.max(now);
+
+                let allowed = b.water.saturating_add(need) <= capacity;
+                if allowed {
+                    b.water += need;
+                }
+                let remaining = Tokens(sat_u64((capacity - b.water) / self.window));
+                let reset_after = ceil_div_nanos(b.water, self.limit);
+
+                if allowed {
+                    Decision::allow(remaining, reset_after)
+                } else {
+                    let retry_after = (u128::from(cost.0) <= self.limit)
+                        .then(|| ceil_div_nanos(b.water + need - capacity, self.limit));
+                    Decision::deny(remaining, reset_after, retry_after)
+                }
+            },
+        )
     }
 
-    fn reset(&mut self, key: &str) {
+    fn reset(&self, key: &str) {
         self.buckets.remove(key);
     }
 }
@@ -71,52 +104,45 @@ impl RateLimiter for LeakyBucket {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::thread::sleep;
+    use crate::ManualClock;
     use std::time::Duration;
 
-    #[test]
-    fn test_leaky_bucket_allows_requests() {
-        let config = RateLimitConfig::per_second(3);
-        let mut limiter = LeakyBucket::new(config);
-
-        // Bucket starts empty, can accept 3 requests
-        assert!(
-            limiter.allow_request("user1").unwrap(),
-            "Request 1 should be allowed"
-        );
-        assert!(
-            limiter.allow_request("user1").unwrap(),
-            "Request 2 should be allowed"
-        );
-        assert!(
-            limiter.allow_request("user1").unwrap(),
-            "Request 3 should be allowed"
-        );
-
-        // 4th request overflows the bucket
-        assert!(
-            !limiter.allow_request("user1").unwrap(),
-            "4th request should be denied"
-        );
+    fn limiter(limit: u64, clock: &ManualClock) -> LeakyBucket<&ManualClock> {
+        LeakyBucket::with_clock(RateLimitConfig::per_second(limit).unwrap(), clock)
     }
 
     #[test]
-    fn test_leaky_bucket_leaks() {
-        let config = RateLimitConfig::per_second(2);
-        let mut limiter = LeakyBucket::new(config);
+    fn starts_empty_and_overflows_at_capacity() {
+        let clock = ManualClock::new();
+        let l = limiter(3, &clock);
+        for _ in 0..3 {
+            assert!(l.check("user1", Cost::ONE).allowed);
+        }
+        assert!(!l.check("user1", Cost::ONE).allowed);
+    }
 
-        // Fill bucket to capacity
-        assert!(limiter.allow_request("user1").unwrap());
-        assert!(limiter.allow_request("user1").unwrap());
+    #[test]
+    fn leaks_over_time() {
+        let clock = ManualClock::new();
+        let l = limiter(2, &clock);
+        assert!(l.check("user1", Cost::ONE).allowed);
+        assert!(l.check("user1", Cost::ONE).allowed);
+        assert!(!l.check("user1", Cost::ONE).allowed);
 
-        // Bucket is full now
-        assert!(!limiter.allow_request("user1").unwrap());
+        clock.advance(Duration::from_secs(1));
+        assert!(l.check("user1", Cost::ONE).allowed);
+        assert!(l.check("user1", Cost::ONE).allowed);
+    }
 
-        // Wait for bucket to leak (1.1 seconds = ~2.2 units leaked)
-        sleep(Duration::from_millis(1100));
-
-        // Bucket should be empty now, can accept requests again
-        assert!(limiter.allow_request("user1").unwrap());
-        assert!(limiter.allow_request("user1").unwrap());
+    #[test]
+    fn retry_after_is_time_to_drain_the_overflow() {
+        let clock = ManualClock::new();
+        let l = limiter(4, &clock);
+        assert!(l.check("k", Cost(4)).allowed);
+        let d = l.check("k", Cost(2));
+        assert!(!d.allowed);
+        // 4 per second drains one unit every 250 ms; 2 units need 500 ms.
+        assert_eq!(d.retry_after, Some(Duration::from_millis(500)));
+        assert_eq!(d.reset_after, Duration::from_secs(1));
     }
 }

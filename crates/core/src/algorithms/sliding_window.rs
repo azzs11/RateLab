@@ -1,61 +1,122 @@
-use crate::{RateLimitConfig, RateLimiter, Result};
-use std::collections::{HashMap, VecDeque};
-use std::time::Instant;
+//! Sliding window log: remembers every admitted request for one window and admits a
+//! new one only if the total in the last `window` stays within `limit`.
 
+use super::with_state;
+use crate::{Clock, Cost, Decision, RateLimitConfig, RateLimiter, Tokens};
+use dashmap::DashMap;
+use std::collections::VecDeque;
+use std::time::Duration;
+
+#[derive(Debug, Default)]
+struct Log {
+    /// (admission time in ns, cost), oldest first. Zero-cost requests are not stored.
+    entries: VecDeque<(u64, u64)>,
+    used: u64,
+}
+
+/// Sliding window log.
+///
+/// Exact: in any span of length `window` it never admits more than `limit` units. The
+/// price is memory: up to `limit` entries per key.
+///
+/// ```
+/// use drl_core::{Cost, ManualClock, RateLimitConfig, RateLimiter, SlidingWindow};
+/// use std::time::Duration;
+///
+/// let clock = ManualClock::new();
+/// let limiter = SlidingWindow::with_clock(RateLimitConfig::per_second(2)?, &clock);
+/// assert!(limiter.check("k", Cost::ONE).allowed);
+/// clock.advance(Duration::from_millis(600));
+/// assert!(limiter.check("k", Cost::ONE).allowed);
+/// assert!(!limiter.check("k", Cost::ONE).allowed);
+///
+/// clock.advance(Duration::from_millis(400)); // the first request leaves the window
+/// assert!(limiter.check("k", Cost::ONE).allowed);
+/// # Ok::<(), drl_core::ConfigError>(())
+/// ```
 #[derive(Debug)]
-struct RequestLog {
-    timestamps: VecDeque<Instant>,
+pub struct SlidingWindow<C> {
+    limit: u64,
+    window: u64,
+    clock: C,
+    logs: DashMap<String, Log>,
 }
 
-/// Sliding Window algorithm implementation
-/// Tracks individual request timestamps in a sliding window
-/// Most accurate but uses more memory
-pub struct SlidingWindow {
-    config: RateLimitConfig,
-    logs: HashMap<String, RequestLog>,
-}
-
-impl SlidingWindow {
-    pub fn new(config: RateLimitConfig) -> Self {
+impl<C: Clock> SlidingWindow<C> {
+    /// A sliding window log that reads time from `clock`.
+    pub fn with_clock(config: RateLimitConfig, clock: C) -> Self {
         Self {
-            config,
-            logs: HashMap::new(),
+            limit: config.limit(),
+            window: config.window_nanos(),
+            clock,
+            logs: DashMap::new(),
         }
     }
 
-    fn clean_old_requests(&mut self, key: &str) {
-        let now = Instant::now();
+    /// Time from `now` until an entry admitted at `at` leaves the window.
+    fn expires_in(&self, at: u64, now: u64) -> Duration {
+        let expiry = u128::from(at) + u128::from(self.window);
+        Duration::from_nanos(
+            u64::try_from(expiry.saturating_sub(u128::from(now))).unwrap_or(u64::MAX),
+        )
+    }
+}
 
-        if let Some(log) = self.logs.get_mut(key) {
-            // Remove requests outside the sliding window
-            while let Some(&timestamp) = log.timestamps.front() {
-                if now.duration_since(timestamp) > self.config.window {
-                    log.timestamps.pop_front();
+#[cfg(feature = "std-clock")]
+impl SlidingWindow<crate::MonotonicClock> {
+    /// A sliding window log on the real monotonic clock.
+    pub fn new(config: RateLimitConfig) -> Self {
+        Self::with_clock(config, crate::MonotonicClock::new())
+    }
+}
+
+impl<C: Clock> RateLimiter for SlidingWindow<C> {
+    fn check(&self, key: &str, cost: Cost) -> Decision {
+        let now = self.clock.now().0;
+
+        with_state(&self.logs, key, Log::default, |log| {
+            // An entry counts while now - at < window.
+            while let Some(&(at, c)) = log.entries.front() {
+                if u128::from(at) + u128::from(self.window) <= u128::from(now) {
+                    log.entries.pop_front();
+                    log.used -= c;
                 } else {
                     break;
                 }
             }
-        }
+
+            let allowed = log.used.saturating_add(cost.0) <= self.limit;
+            if allowed && cost.0 > 0 {
+                log.entries.push_back((now, cost.0));
+                log.used += cost.0;
+            }
+            let remaining = Tokens(self.limit - log.used);
+            let reset_after = log
+                .entries
+                .back()
+                .map_or(Duration::ZERO, |&(at, _)| self.expires_in(at, now));
+
+            if allowed {
+                return Decision::allow(remaining, reset_after);
+            }
+            if cost.0 > self.limit {
+                return Decision::deny(remaining, reset_after, None);
+            }
+            // Find the oldest entry whose expiry frees enough room.
+            let mut used = log.used;
+            let mut retry_after = None;
+            for &(at, c) in &log.entries {
+                used -= c;
+                if used + cost.0 <= self.limit {
+                    retry_after = Some(self.expires_in(at, now));
+                    break;
+                }
+            }
+            Decision::deny(remaining, reset_after, retry_after)
+        })
     }
-}
 
-impl RateLimiter for SlidingWindow {
-    fn allow_request(&mut self, key: &str) -> Result<bool> {
-        self.clean_old_requests(key);
-
-        let log = self.logs.entry(key.to_string()).or_insert(RequestLog {
-            timestamps: VecDeque::new(),
-        });
-
-        if log.timestamps.len() < self.config.max_requests as usize {
-            log.timestamps.push_back(Instant::now());
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    fn reset(&mut self, key: &str) {
+    fn reset(&self, key: &str) {
         self.logs.remove(key);
     }
 }
@@ -63,38 +124,55 @@ impl RateLimiter for SlidingWindow {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::thread::sleep;
-    use std::time::Duration;
+    use crate::ManualClock;
 
     #[test]
-    fn test_sliding_window_allows_requests() {
-        let config = RateLimitConfig::per_second(5);
-        let mut limiter = SlidingWindow::new(config);
-
-        // Should allow 5 requests
+    fn allows_limit_then_denies() {
+        let clock = ManualClock::new();
+        let l = SlidingWindow::with_clock(RateLimitConfig::per_second(5).unwrap(), &clock);
         for _ in 0..5 {
-            assert!(limiter.allow_request("user1").unwrap());
+            assert!(l.check("user1", Cost::ONE).allowed);
         }
-
-        // 6th should be denied
-        assert!(!limiter.allow_request("user1").unwrap());
+        assert!(!l.check("user1", Cost::ONE).allowed);
     }
 
     #[test]
-    fn test_sliding_window_slides() {
-        let config = RateLimitConfig::new(3, Duration::from_millis(500));
-        let mut limiter = SlidingWindow::new(config);
-
-        // Use up limit
+    fn slides_as_old_requests_expire() {
+        let clock = ManualClock::new();
+        let config = RateLimitConfig::new(3, Duration::from_millis(500)).unwrap();
+        let l = SlidingWindow::with_clock(config, &clock);
         for _ in 0..3 {
-            assert!(limiter.allow_request("user1").unwrap());
+            assert!(l.check("user1", Cost::ONE).allowed);
         }
-        assert!(!limiter.allow_request("user1").unwrap());
+        assert!(!l.check("user1", Cost::ONE).allowed);
 
-        // Wait for oldest request to slide out
-        sleep(Duration::from_millis(600));
+        clock.advance(Duration::from_millis(500));
+        assert!(l.check("user1", Cost::ONE).allowed);
+    }
 
-        // Should allow new requests as old ones slide out
-        assert!(limiter.allow_request("user1").unwrap());
+    #[test]
+    fn retry_after_waits_for_enough_expiries() {
+        let clock = ManualClock::new();
+        let l = SlidingWindow::with_clock(RateLimitConfig::per_second(3).unwrap(), &clock);
+        assert!(l.check("k", Cost::ONE).allowed); // t = 0
+        clock.advance(Duration::from_millis(100));
+        assert!(l.check("k", Cost::ONE).allowed); // t = 100
+        clock.advance(Duration::from_millis(100));
+        assert!(l.check("k", Cost::ONE).allowed); // t = 200
+
+        // Two units need the first two entries gone: at t = 1100, i.e. in 900 ms.
+        let d = l.check("k", Cost(2));
+        assert!(!d.allowed);
+        assert_eq!(d.retry_after, Some(Duration::from_millis(900)));
+        assert_eq!(d.reset_after, Duration::from_millis(1000));
+    }
+
+    #[test]
+    fn no_boundary_burst() {
+        let clock = ManualClock::starting_at(crate::Nanos(999_000_000));
+        let l = SlidingWindow::with_clock(RateLimitConfig::per_second(10).unwrap(), &clock);
+        assert!(l.check("k", Cost(10)).allowed);
+        clock.advance(Duration::from_millis(2));
+        assert!(!l.check("k", Cost::ONE).allowed);
     }
 }

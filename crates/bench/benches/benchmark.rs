@@ -1,112 +1,34 @@
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
-use drl_core::algorithms::*;
-use drl_core::{RateLimitConfig, RateLimiter};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use drl_core::{Algorithm, Cost, MonotonicClock, RateLimitConfig};
+use std::hint::black_box;
 
-fn benchmark_token_bucket(c: &mut Criterion) {
-    let mut group = c.benchmark_group("token_bucket");
-
-    for rate in [100, 1000, 10000, 100000].iter() {
-        let config = RateLimitConfig::per_second(*rate);
-        let mut limiter = TokenBucket::new(config);
-
-        group.bench_with_input(BenchmarkId::from_parameter(rate), rate, |b, _| {
-            b.iter(|| {
-                let _ = limiter.allow_request(black_box("user1"));
+/// Single-threaded decision time for one hot key, per algorithm and limit.
+fn single_key(c: &mut Criterion) {
+    for algorithm in Algorithm::ALL {
+        let mut group = c.benchmark_group(algorithm.name());
+        for limit in [100u64, 1_000, 10_000, 100_000] {
+            let config = RateLimitConfig::per_second(limit).expect("valid config");
+            let limiter = algorithm.build(config, MonotonicClock::new());
+            group.bench_with_input(BenchmarkId::from_parameter(limit), &limit, |b, _| {
+                b.iter(|| limiter.check(black_box("user1"), Cost::ONE));
             });
-        });
+        }
+        group.finish();
     }
-    group.finish();
 }
 
-fn benchmark_leaky_bucket(c: &mut Criterion) {
-    let mut group = c.benchmark_group("leaky_bucket");
-
-    for rate in [100, 1000, 10000, 100000].iter() {
-        let config = RateLimitConfig::per_second(*rate);
-        let mut limiter = LeakyBucket::new(config);
-
-        group.bench_with_input(BenchmarkId::from_parameter(rate), rate, |b, _| {
-            b.iter(|| {
-                let _ = limiter.allow_request(black_box("user1"));
-            });
-        });
-    }
-    group.finish();
-}
-
-fn benchmark_fixed_window(c: &mut Criterion) {
-    let mut group = c.benchmark_group("fixed_window");
-
-    for rate in [100, 1000, 10000, 100000].iter() {
-        let config = RateLimitConfig::per_second(*rate);
-        let mut limiter = FixedWindow::new(config);
-
-        group.bench_with_input(BenchmarkId::from_parameter(rate), rate, |b, _| {
-            b.iter(|| {
-                let _ = limiter.allow_request(black_box("user1"));
-            });
-        });
-    }
-    group.finish();
-}
-
-fn benchmark_sliding_window(c: &mut Criterion) {
-    let mut group = c.benchmark_group("sliding_window");
-
-    for rate in [100, 1000, 10000].iter() {
-        let config = RateLimitConfig::per_second(*rate);
-        let mut limiter = SlidingWindow::new(config);
-
-        group.bench_with_input(BenchmarkId::from_parameter(rate), rate, |b, _| {
-            b.iter(|| {
-                let _ = limiter.allow_request(black_box("user1"));
-            });
-        });
-    }
-    group.finish();
-}
-
-fn benchmark_comparison(c: &mut Criterion) {
+/// All algorithms side by side at one limit.
+fn comparison(c: &mut Criterion) {
     let mut group = c.benchmark_group("algorithm_comparison");
-    let config = RateLimitConfig::per_second(1000);
-
-    group.bench_function("token_bucket", |b| {
-        let mut limiter = TokenBucket::new(config.clone());
-        b.iter(|| {
-            let _ = limiter.allow_request(black_box("user1"));
+    let config = RateLimitConfig::per_second(1000).expect("valid config");
+    for algorithm in Algorithm::ALL {
+        let limiter = algorithm.build(config, MonotonicClock::new());
+        group.bench_function(algorithm.name(), |b| {
+            b.iter(|| limiter.check(black_box("user1"), Cost::ONE));
         });
-    });
-
-    group.bench_function("leaky_bucket", |b| {
-        let mut limiter = LeakyBucket::new(config.clone());
-        b.iter(|| {
-            let _ = limiter.allow_request(black_box("user1"));
-        });
-    });
-
-    group.bench_function("fixed_window", |b| {
-        let mut limiter = FixedWindow::new(config.clone());
-        b.iter(|| {
-            let _ = limiter.allow_request(black_box("user1"));
-        });
-    });
-
-    group.bench_function("sliding_window", |b| {
-        let mut limiter = SlidingWindow::new(config.clone());
-        b.iter(|| {
-            let _ = limiter.allow_request(black_box("user1"));
-        });
-    });
-
+    }
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    benchmark_token_bucket,
-    benchmark_leaky_bucket,
-    benchmark_fixed_window,
-    benchmark_sliding_window,
-    benchmark_comparison
-);
+criterion_group!(benches, single_key, comparison);
 criterion_main!(benches);

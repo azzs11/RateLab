@@ -1,90 +1,77 @@
-use drl_core::algorithms::*;
-use drl_core::{RateLimitConfig, RateLimiter};
+use drl_core::{Algorithm, Cost, MonotonicClock, RateLimitConfig, RateLimiter};
 use drl_redis_store::RedisRateLimiter;
 use server::metrics::{self, record_request};
 use std::time::{Duration, Instant};
 
 #[tokio::main]
 async fn main() {
-    // Initialize metrics
     metrics::init_metrics();
 
     println!("🚀 Distributed Rate Limiter - Demo");
     println!("======================================\n");
 
-    let config = RateLimitConfig::per_second(3);
+    let config = match RateLimitConfig::per_second(3) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("invalid config: {e}");
+            return;
+        }
+    };
 
     println!("Testing all 4 rate limiting algorithms WITH METRICS");
     println!("Config: 3 requests per second\n");
 
-    // Test 1: Token Bucket
-    println!("1️⃣  TOKEN BUCKET");
-    println!("   (Tokens refill over time)");
-    println!("   ----------------------------");
-    test_algorithm_with_metrics("Token Bucket", TokenBucket::new(config.clone())).await;
+    let descriptions = [
+        "(Tokens refill over time)",
+        "(Queue that leaks at constant rate)",
+        "(Counter resets every window)",
+        "(Tracks exact timestamps)",
+    ];
+    for (n, (algorithm, about)) in Algorithm::ALL.iter().zip(descriptions).enumerate() {
+        println!(
+            "{}. {}",
+            n + 1,
+            algorithm.name().replace('_', " ").to_uppercase()
+        );
+        println!("   {about}");
+        println!("   ----------------------------");
+        let limiter = algorithm.build(config, MonotonicClock::new());
+        run_algorithm(&limiter).await;
+        println!("\n");
+    }
 
-    println!("\n");
-
-    // Test 2: Leaky Bucket
-    println!("2️⃣  LEAKY BUCKET");
-    println!("   (Queue that leaks at constant rate)");
-    println!("   ----------------------------");
-    test_algorithm_with_metrics("Leaky Bucket", LeakyBucket::new(config.clone())).await;
-
-    println!("\n");
-
-    // Test 3: Fixed Window
-    println!("3️⃣  FIXED WINDOW");
-    println!("   (Counter resets every window)");
-    println!("   ----------------------------");
-    test_algorithm_with_metrics("Fixed Window", FixedWindow::new(config.clone())).await;
-
-    println!("\n");
-
-    // Test 4: Sliding Window
-    println!("4️⃣  SLIDING WINDOW");
-    println!("   (Tracks exact timestamps)");
-    println!("   ----------------------------");
-    test_algorithm_with_metrics("Sliding Window", SlidingWindow::new(config.clone())).await;
-
-    println!("\n");
-
-    // Test 5: Redis Distributed
-    println!("5️⃣  REDIS DISTRIBUTED");
+    println!("5. REDIS (prototype)");
     println!("   (Token Bucket with Redis backend)");
     println!("   ----------------------------");
-    test_redis().await;
+    run_redis(config);
 
     println!("\n");
     println!("✨ Demo complete.");
 
-    // Print metrics summary
     metrics::print_metrics_summary();
 
     println!("\n💡 Measure throughput on your machine: cargo bench");
 
-    // Show how to access metrics
     println!("\n🔍 Prometheus Metrics Format:");
     println!("==============================");
-    let metrics_output = metrics::get_metrics();
-    println!("{}", metrics_output);
+    println!("{}", metrics::get_metrics());
 }
 
-async fn test_algorithm_with_metrics<T: RateLimiter>(_name: &str, mut limiter: T) {
+fn show(i: u32, allowed: bool) {
+    let label = if allowed {
+        "✅ ALLOWED"
+    } else {
+        "❌ BLOCKED"
+    };
+    println!("   Request {i}: {label}");
+}
+
+async fn run_algorithm(limiter: &dyn RateLimiter) {
     for i in 1..=5 {
         let start = Instant::now();
-        let allowed = limiter.allow_request("user_test").unwrap();
+        let allowed = limiter.check("user_test", Cost::ONE).allowed;
         record_request(allowed, start);
-
-        println!(
-            "   Request {}: {}",
-            i,
-            if allowed {
-                "✅ ALLOWED"
-            } else {
-                "❌ BLOCKED"
-            }
-        );
+        show(i, allowed);
     }
 
     println!("   ⏳ Waiting 1 second...");
@@ -92,57 +79,39 @@ async fn test_algorithm_with_metrics<T: RateLimiter>(_name: &str, mut limiter: T
 
     for i in 1..=2 {
         let start = Instant::now();
-        let allowed = limiter.allow_request("user_test").unwrap();
+        let allowed = limiter.check("user_test", Cost::ONE).allowed;
         record_request(allowed, start);
-
-        println!(
-            "   Request {}: {}",
-            i,
-            if allowed {
-                "✅ ALLOWED"
-            } else {
-                "❌ BLOCKED"
-            }
-        );
+        show(i, allowed);
     }
 }
 
-async fn test_redis() {
-    let redis_url = "redis://127.0.0.1/";
-    let config = RateLimitConfig::per_second(3);
-
-    match RedisRateLimiter::new(redis_url, config) {
-        Ok(mut limiter) => {
-            println!("   ✅ Connected to Redis\n");
-            limiter.reset("user_redis");
-
-            for i in 1..=5 {
-                match limiter.allow_request("user_redis") {
-                    Ok(allowed) => {
-                        let start = Instant::now();
-                        record_request(allowed, start);
-                        println!(
-                            "   Request {}: {}",
-                            i,
-                            if allowed {
-                                "✅ ALLOWED"
-                            } else {
-                                "❌ BLOCKED"
-                            }
-                        );
-                    }
-                    Err(_) => {
-                        println!("   ⚠️  Redis connection lost during test");
-                        break;
-                    }
-                }
-            }
-
-            limiter.reset("user_redis");
+fn run_redis(config: RateLimitConfig) {
+    let limiter = match RedisRateLimiter::new("redis://127.0.0.1/", config) {
+        Ok(l) => l,
+        Err(e) => {
+            println!("   ⚠️  Invalid Redis URL: {e}");
+            return;
         }
-        Err(_) => {
-            println!("   ⚠️  Redis not available (start Redis server to test distributed mode)");
-            println!("   💡 Run: redis-server.exe");
+    };
+    if limiter.reset("user_redis").is_err() {
+        println!("   ⚠️  Redis not available (start a Redis server to try this mode)");
+        println!("   💡 Run: redis-server");
+        return;
+    }
+    println!("   ✅ Connected to Redis\n");
+
+    for i in 1..=5 {
+        let start = Instant::now();
+        match limiter.check("user_redis", Cost::ONE) {
+            Ok(decision) => {
+                record_request(decision.allowed, start);
+                show(i, decision.allowed);
+            }
+            Err(_) => {
+                println!("   ⚠️  Redis connection lost during test");
+                break;
+            }
         }
     }
+    let _ = limiter.reset("user_redis");
 }

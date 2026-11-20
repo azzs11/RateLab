@@ -4,8 +4,7 @@ use actix_web::{App, HttpResponse, HttpServer, Result, get, post, web};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
-use drl_core::algorithms::*;
-use drl_core::{RateLimitConfig, RateLimiter};
+use drl_core::{Algorithm, Cost, MonotonicClock, RateLimitConfig};
 use server::metrics;
 
 #[derive(Serialize)]
@@ -60,105 +59,35 @@ async fn get_metrics() -> Result<HttpResponse> {
 
 #[post("/api/test")]
 async fn test_rate_limiter(req: web::Json<TestRequest>) -> Result<HttpResponse> {
-    let config = RateLimitConfig::new(
+    let algorithm: Algorithm = match req.algorithm.parse() {
+        Ok(a) => a,
+        Err(e) => return Ok(HttpResponse::BadRequest().body(e.to_string())),
+    };
+    let config = match RateLimitConfig::new(
         req.max_requests,
         std::time::Duration::from_secs(req.window_seconds),
-    );
+    ) {
+        Ok(c) => c,
+        Err(e) => return Ok(HttpResponse::BadRequest().body(e.to_string())),
+    };
+    let limiter = algorithm.build(config, MonotonicClock::new());
 
     let start = Instant::now();
-    let mut allowed_count = 0;
-    let mut blocked_count = 0;
-    let mut results = Vec::new();
-
-    match req.algorithm.as_str() {
-        "token_bucket" => {
-            let mut limiter = TokenBucket::new(config);
-            for _ in 0..req.num_requests {
-                let req_start = Instant::now();
-                match limiter.allow_request("test_user") {
-                    Ok(true) => {
-                        allowed_count += 1;
-                        results.push(true);
-                        metrics::record_request(true, req_start);
-                    }
-                    Ok(false) => {
-                        blocked_count += 1;
-                        results.push(false);
-                        metrics::record_request(false, req_start);
-                    }
-                    Err(_) => {}
-                }
-            }
-        }
-        "leaky_bucket" => {
-            let mut limiter = LeakyBucket::new(config);
-            for _ in 0..req.num_requests {
-                let req_start = Instant::now();
-                match limiter.allow_request("test_user") {
-                    Ok(true) => {
-                        allowed_count += 1;
-                        results.push(true);
-                        metrics::record_request(true, req_start);
-                    }
-                    Ok(false) => {
-                        blocked_count += 1;
-                        results.push(false);
-                        metrics::record_request(false, req_start);
-                    }
-                    Err(_) => {}
-                }
-            }
-        }
-        "fixed_window" => {
-            let mut limiter = FixedWindow::new(config);
-            for _ in 0..req.num_requests {
-                let req_start = Instant::now();
-                match limiter.allow_request("test_user") {
-                    Ok(true) => {
-                        allowed_count += 1;
-                        results.push(true);
-                        metrics::record_request(true, req_start);
-                    }
-                    Ok(false) => {
-                        blocked_count += 1;
-                        results.push(false);
-                        metrics::record_request(false, req_start);
-                    }
-                    Err(_) => {}
-                }
-            }
-        }
-        "sliding_window" => {
-            let mut limiter = SlidingWindow::new(config);
-            for _ in 0..req.num_requests {
-                let req_start = Instant::now();
-                match limiter.allow_request("test_user") {
-                    Ok(true) => {
-                        allowed_count += 1;
-                        results.push(true);
-                        metrics::record_request(true, req_start);
-                    }
-                    Ok(false) => {
-                        blocked_count += 1;
-                        results.push(false);
-                        metrics::record_request(false, req_start);
-                    }
-                    Err(_) => {}
-                }
-            }
-        }
-        _ => {}
+    let mut results = Vec::with_capacity(req.num_requests as usize);
+    for _ in 0..req.num_requests {
+        let req_start = Instant::now();
+        let allowed = limiter.check("test_user", Cost::ONE).allowed;
+        metrics::record_request(allowed, req_start);
+        results.push(allowed);
     }
 
     let duration = start.elapsed();
-    let duration_ms = duration.as_secs_f64() * 1000.0;
-    let requests_per_sec = req.num_requests as f64 / duration.as_secs_f64();
-
+    let allowed = results.iter().filter(|&&a| a).count() as u32;
     Ok(HttpResponse::Ok().json(TestResponse {
-        allowed: allowed_count,
-        blocked: blocked_count,
-        duration_ms,
-        requests_per_sec,
+        allowed,
+        blocked: req.num_requests - allowed,
+        duration_ms: duration.as_secs_f64() * 1000.0,
+        requests_per_sec: req.num_requests as f64 / duration.as_secs_f64(),
         results,
     }))
 }

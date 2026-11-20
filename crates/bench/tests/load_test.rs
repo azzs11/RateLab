@@ -1,11 +1,10 @@
-use drl_core::algorithms::*;
-use drl_core::{RateLimitConfig, RateLimiter};
+use drl_core::{Cost, FixedWindow, LeakyBucket, RateLimitConfig, RateLimiter, TokenBucket};
 use std::time::Instant;
 
 #[test]
 fn load_test_token_bucket() {
-    let config = RateLimitConfig::per_second(10000);
-    let mut limiter = TokenBucket::new(config);
+    let config = RateLimitConfig::per_second(10000).unwrap();
+    let limiter = TokenBucket::new(config);
 
     let start = Instant::now();
     let mut allowed = 0;
@@ -14,10 +13,10 @@ fn load_test_token_bucket() {
     // Simulate 50,000 requests
     for i in 0..50000 {
         let key = format!("user{}", i % 100); // 100 different users
-        match limiter.allow_request(&key) {
-            Ok(true) => allowed += 1,
-            Ok(false) => blocked += 1,
-            Err(_) => {}
+        if limiter.check(&key, Cost::ONE).allowed {
+            allowed += 1;
+        } else {
+            blocked += 1;
         }
     }
 
@@ -41,8 +40,8 @@ fn load_test_token_bucket() {
 
 #[test]
 fn load_test_leaky_bucket() {
-    let config = RateLimitConfig::per_second(10000);
-    let mut limiter = LeakyBucket::new(config);
+    let config = RateLimitConfig::per_second(10000).unwrap();
+    let limiter = LeakyBucket::new(config);
 
     let start = Instant::now();
     let mut allowed = 0;
@@ -50,10 +49,10 @@ fn load_test_leaky_bucket() {
 
     for i in 0..50000 {
         let key = format!("user{}", i % 100);
-        match limiter.allow_request(&key) {
-            Ok(true) => allowed += 1,
-            Ok(false) => blocked += 1,
-            Err(_) => {}
+        if limiter.check(&key, Cost::ONE).allowed {
+            allowed += 1;
+        } else {
+            blocked += 1;
         }
     }
 
@@ -72,8 +71,8 @@ fn load_test_leaky_bucket() {
 
 #[test]
 fn load_test_fixed_window() {
-    let config = RateLimitConfig::per_second(10000);
-    let mut limiter = FixedWindow::new(config);
+    let config = RateLimitConfig::per_second(10000).unwrap();
+    let limiter = FixedWindow::new(config);
 
     let start = Instant::now();
     let mut allowed = 0;
@@ -81,10 +80,10 @@ fn load_test_fixed_window() {
 
     for i in 0..50000 {
         let key = format!("user{}", i % 100);
-        match limiter.allow_request(&key) {
-            Ok(true) => allowed += 1,
-            Ok(false) => blocked += 1,
-            Err(_) => {}
+        if limiter.check(&key, Cost::ONE).allowed {
+            allowed += 1;
+        } else {
+            blocked += 1;
         }
     }
 
@@ -103,15 +102,15 @@ fn load_test_fixed_window() {
 
 #[test]
 fn latency_test() {
-    let config = RateLimitConfig::per_second(1000);
-    let mut limiter = TokenBucket::new(config);
+    let config = RateLimitConfig::per_second(1000).unwrap();
+    let limiter = TokenBucket::new(config);
 
     let mut latencies = Vec::new();
 
     // Measure 1000 individual requests
     for i in 0..1000 {
         let start = Instant::now();
-        let _ = limiter.allow_request(&format!("user{}", i % 10));
+        let _ = limiter.check(&format!("user{}", i % 10), Cost::ONE);
         let latency = start.elapsed();
         latencies.push(latency.as_micros());
     }

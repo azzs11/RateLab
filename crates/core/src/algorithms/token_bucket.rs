@@ -1,66 +1,107 @@
-use crate::{RateLimitConfig, RateLimiter, Result};
-use std::collections::HashMap;
-use std::time::Instant;
+//! Token bucket: a bucket of `limit` tokens refills continuously at `limit` per
+//! `window`; each request spends `cost` tokens.
 
+use super::{ceil_div_nanos, sat_u64, with_state};
+use crate::{Clock, Cost, Decision, RateLimitConfig, RateLimiter, Tokens};
+use dashmap::DashMap;
+
+/// Per-key state. Token amounts are scaled by `window_nanos` so refill is exact in
+/// integers: one nanosecond adds `limit` scaled units.
 #[derive(Debug)]
-struct BucketState {
-    tokens: f64,
-    last_refill: Instant,
+struct Bucket {
+    level: u128,
+    last: u64,
 }
 
-/// Token Bucket algorithm implementation
-/// Tokens are added at a constant rate, requests consume tokens
-pub struct TokenBucket {
-    config: RateLimitConfig,
-    buckets: HashMap<String, BucketState>,
-    refill_rate: f64, // tokens per second
+/// Token bucket limiter.
+///
+/// Allows a burst of up to `limit` units, then refills smoothly. In any span of length
+/// `window` it can admit up to about `2 × limit` units (a full bucket plus one window
+/// of refill).
+///
+/// ```
+/// use drl_core::{Cost, ManualClock, RateLimitConfig, RateLimiter, TokenBucket};
+/// use std::time::Duration;
+///
+/// let clock = ManualClock::new();
+/// let limiter = TokenBucket::with_clock(RateLimitConfig::per_second(4)?, &clock);
+/// for _ in 0..4 {
+///     assert!(limiter.check("k", Cost::ONE).allowed);
+/// }
+/// assert!(!limiter.check("k", Cost::ONE).allowed);
+///
+/// clock.advance(Duration::from_millis(250)); // a quarter window refills one token
+/// assert!(limiter.check("k", Cost::ONE).allowed);
+/// # Ok::<(), drl_core::ConfigError>(())
+/// ```
+#[derive(Debug)]
+pub struct TokenBucket<C> {
+    limit: u128,
+    window: u128,
+    clock: C,
+    buckets: DashMap<String, Bucket>,
 }
 
-impl TokenBucket {
-    pub fn new(config: RateLimitConfig) -> Self {
-        let refill_rate = config.max_requests as f64 / config.window.as_secs_f64();
-
+impl<C: Clock> TokenBucket<C> {
+    /// A token bucket that reads time from `clock`.
+    pub fn with_clock(config: RateLimitConfig, clock: C) -> Self {
         Self {
-            config,
-            buckets: HashMap::new(),
-            refill_rate,
+            limit: u128::from(config.limit()),
+            window: u128::from(config.window_nanos()),
+            clock,
+            buckets: DashMap::new(),
         }
-    }
-
-    fn refill_tokens(&mut self, key: &str) -> &mut BucketState {
-        let now = Instant::now();
-        let max_tokens = self.config.max_requests as f64;
-
-        let bucket = self.buckets.entry(key.to_string()).or_insert(BucketState {
-            tokens: max_tokens,
-            last_refill: now,
-        });
-
-        // Calculate tokens to add based on time elapsed
-        let elapsed = now.duration_since(bucket.last_refill).as_secs_f64();
-        let tokens_to_add = elapsed * self.refill_rate;
-
-        // Add tokens but don't exceed max capacity
-        bucket.tokens = (bucket.tokens + tokens_to_add).min(max_tokens);
-        bucket.last_refill = now;
-
-        bucket
     }
 }
 
-impl RateLimiter for TokenBucket {
-    fn allow_request(&mut self, key: &str) -> Result<bool> {
-        let bucket = self.refill_tokens(key);
+#[cfg(feature = "std-clock")]
+impl TokenBucket<crate::MonotonicClock> {
+    /// A token bucket on the real monotonic clock.
+    pub fn new(config: RateLimitConfig) -> Self {
+        Self::with_clock(config, crate::MonotonicClock::new())
+    }
+}
 
-        if bucket.tokens >= 1.0 {
-            bucket.tokens -= 1.0;
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+impl<C: Clock> RateLimiter for TokenBucket<C> {
+    fn check(&self, key: &str, cost: Cost) -> Decision {
+        let now = self.clock.now().0;
+        let capacity = self.limit * self.window;
+        let need = u128::from(cost.0) * self.window;
+
+        with_state(
+            &self.buckets,
+            key,
+            || Bucket {
+                level: capacity,
+                last: now,
+            },
+            |b| {
+                let elapsed = u128::from(now.saturating_sub(b.last));
+                b.level = b
+                    .level
+                    .saturating_add(elapsed.saturating_mul(self.limit))
+                    .min(capacity);
+                b.last = b.last.max(now);
+
+                let allowed = b.level >= need;
+                if allowed {
+                    b.level -= need;
+                }
+                let remaining = Tokens(sat_u64(b.level / self.window));
+                let reset_after = ceil_div_nanos(capacity - b.level, self.limit);
+
+                if allowed {
+                    Decision::allow(remaining, reset_after)
+                } else {
+                    let retry_after = (u128::from(cost.0) <= self.limit)
+                        .then(|| ceil_div_nanos(need - b.level, self.limit));
+                    Decision::deny(remaining, reset_after, retry_after)
+                }
+            },
+        )
     }
 
-    fn reset(&mut self, key: &str) {
+    fn reset(&self, key: &str) {
         self.buckets.remove(key);
     }
 }
@@ -68,49 +109,68 @@ impl RateLimiter for TokenBucket {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::thread::sleep;
+    use crate::ManualClock;
     use std::time::Duration;
 
-    #[test]
-    fn test_token_bucket_allows_requests() {
-        let config = RateLimitConfig::per_second(5);
-        let mut limiter = TokenBucket::new(config);
+    fn limiter(limit: u64, clock: &ManualClock) -> TokenBucket<&ManualClock> {
+        TokenBucket::with_clock(RateLimitConfig::per_second(limit).unwrap(), clock)
+    }
 
-        // Should allow 5 requests immediately
-        for _ in 0..5 {
-            assert!(limiter.allow_request("user1").unwrap());
+    #[test]
+    fn allows_a_full_burst_then_denies() {
+        let clock = ManualClock::new();
+        let l = limiter(5, &clock);
+        for i in 0..5 {
+            let d = l.check("user1", Cost::ONE);
+            assert!(d.allowed);
+            assert_eq!(d.remaining, Tokens(4 - i));
         }
-
-        // 6th request should be denied
-        assert!(!limiter.allow_request("user1").unwrap());
+        assert!(!l.check("user1", Cost::ONE).allowed);
     }
 
     #[test]
-    fn test_token_bucket_refills() {
-        let config = RateLimitConfig::per_second(2);
-        let mut limiter = TokenBucket::new(config);
+    fn refills_over_time() {
+        let clock = ManualClock::new();
+        let l = limiter(2, &clock);
+        assert!(l.check("user1", Cost::ONE).allowed);
+        assert!(l.check("user1", Cost::ONE).allowed);
+        assert!(!l.check("user1", Cost::ONE).allowed);
 
-        // Use up tokens
-        assert!(limiter.allow_request("user1").unwrap());
-        assert!(limiter.allow_request("user1").unwrap());
-        assert!(!limiter.allow_request("user1").unwrap());
-
-        // Wait for refill
-        sleep(Duration::from_secs(1));
-
-        // Should have new tokens
-        assert!(limiter.allow_request("user1").unwrap());
+        clock.advance(Duration::from_secs(1));
+        assert!(l.check("user1", Cost::ONE).allowed);
+        assert!(l.check("user1", Cost::ONE).allowed);
+        assert!(!l.check("user1", Cost::ONE).allowed);
     }
 
     #[test]
-    fn test_token_bucket_different_keys() {
-        let config = RateLimitConfig::per_second(2);
-        let mut limiter = TokenBucket::new(config);
+    fn partial_refill_is_exact() {
+        let clock = ManualClock::new();
+        let l = limiter(10, &clock);
+        assert!(l.check("k", Cost(10)).allowed);
+        // 10 per second = one token every 100 ms.
+        clock.advance(Duration::from_millis(99));
+        assert!(!l.check("k", Cost::ONE).allowed);
+        clock.advance(Duration::from_millis(1));
+        assert!(l.check("k", Cost::ONE).allowed);
+    }
 
-        // Different keys have independent limits
-        assert!(limiter.allow_request("user1").unwrap());
-        assert!(limiter.allow_request("user2").unwrap());
-        assert!(limiter.allow_request("user1").unwrap());
-        assert!(limiter.allow_request("user2").unwrap());
+    #[test]
+    fn retry_after_reports_the_deficit() {
+        let clock = ManualClock::new();
+        let l = limiter(10, &clock);
+        assert!(l.check("k", Cost(10)).allowed);
+        let d = l.check("k", Cost(3));
+        assert!(!d.allowed);
+        assert_eq!(d.retry_after, Some(Duration::from_millis(300)));
+        assert_eq!(d.reset_after, Duration::from_secs(1));
+    }
+
+    #[test]
+    fn different_keys_are_independent() {
+        let clock = ManualClock::new();
+        let l = limiter(1, &clock);
+        assert!(l.check("user1", Cost::ONE).allowed);
+        assert!(l.check("user2", Cost::ONE).allowed);
+        assert!(!l.check("user1", Cost::ONE).allowed);
     }
 }
