@@ -8,7 +8,9 @@
 
 **Rate limiting algorithms in Rust (token bucket, leaky bucket, fixed and sliding window, GCRA), shared across nodes through Redis, with a benchmark that reproduces every number below.**
 
-[Features](#features) • [Quick Start](#quick-start) • [Benchmarks](#benchmarks) • [Roadmap](#roadmap)
+**[Open the playground](https://azzs11.github.io/distributed-rate-limiter/)**: the real library, compiled to WebAssembly, running in your browser.
+
+[Playground](#playground) • [Features](#features) • [Quick Start](#quick-start) • [Benchmarks](#benchmarks) • [Roadmap](#roadmap)
 
 </div>
 
@@ -118,7 +120,6 @@ too early. `/metrics` exports Prometheus counters and a decision-time histogram
 
 ### Other
 
-- **Web dashboard:** run a burst of requests against any algorithm and see allowed/blocked results
 - **Simulator** (`crates/sim`): seeded, deterministic traffic (steady Poisson, on/off,
   heavy-tailed Pareto, diurnal ramp, flash crowd, the fixed-window boundary attack)
   replayed through any limiter, identical on every platform
@@ -131,38 +132,49 @@ too early. `/metrics` exports Prometheus counters and a decision-time histogram
 |-------|---------------|
 | `crates/core` (`drl-core`) | Algorithms, coordination strategies, `Clock`, `Decision`, circuit breaker, unit newtypes. No I/O. |
 | `crates/redis-store` (`drl-redis-store`) | Redis token bucket (Lua, EVALSHA, Redis `TIME`) and `GuardedLimiter` |
-| `crates/server` | Axum server with the Tower layer and dashboard (`web-server`), demo binary (`demo`) |
+| `crates/server` | Axum server with the Tower layer (`web-server`, serves the built playground), demo binary (`demo`) |
 | `crates/sim` | Deterministic traffic scenarios and the multi-node cluster simulator |
-| `crates/wasm` | wasm-bindgen wrapper for the browser |
+| `crates/wasm` | wasm-bindgen bindings: live limiter, traffic, lab traces, cluster simulator, log replay |
 | `crates/bench` | Exact oracle, measurement suite, load generator, RESULTS.md writer, Criterion benches |
 | `deploy/` | Dockerfile and Docker Compose: 3 nodes, Redis, load generator |
+| `web/` | The playground: Vite + TypeScript + the WebAssembly module, deployed to GitHub Pages |
 
 ---
 
-## Demo
+## Playground
 
-### Web dashboard
+**[azzs11.github.io/distributed-rate-limiter](https://azzs11.github.io/distributed-rate-limiter/)**
+
+The playground runs the project's own Rust code in the browser (compiled to
+WebAssembly), so every number it shows is computed live by the library, or comes from
+the benchmark's result files.
+
+| View | What you can do |
+|------|-----------------|
+| **Story** | Opens on the boundary attack, already playing: fixed window, sliding window and GCRA under the same burst at a window edge |
+| **Lab** | Pick an algorithm (or two, side by side), traffic and limit; play and scrub through every decision and the algorithm's state: the bucket level, the window counter, the sliding log, GCRA's theoretical arrival time |
+| **Cluster** | 2 to 8 nodes sharing one limit with any coordination strategy; change delay, clock skew and traffic skew, cut the store off, and watch admission error against a perfectly coordinated limiter |
+| **Explorer** | The benchmark's Pareto chart (store calls against admission error); select any point to replay that configuration in the cluster simulator |
+| **Replay** | Drop an access log (CSV, JSON Lines or nginx/Apache combined). It is replayed through every algorithm and strategy **inside the page**, nothing is uploaded, and you get the smallest limit that keeps blocking under your target |
+| **Results** | Every result file as tables, with the machine and commit each was measured on |
 
 <p align="center">
-  <img src="docs/screenshots/Metrics_1.png" width="45%" />
-  <img src="docs/screenshots/Metrics_graph_1.png" width="45%" />
+  <img src="docs/screenshots/playground-story.png" width="49%" alt="The story page: the headline and the live boundary attack figure" />
+  <img src="docs/screenshots/playground-cluster.png" width="49%" alt="The cluster simulator in dark mode during a store outage" />
 </p>
 
-<p align="center"><em>Screenshots of one local run. The values come from the dashboard on that machine; they are not benchmark results.</em></p>
-
-### Algorithm guide
-
-<p align="center">
-  <img src="docs/screenshots/Alg_1.png" width="70%" />
-</p>
+Built for everyone: light and dark themes, full keyboard control, screen-reader
+labels for every figure, and stepped frames instead of animation when the system asks
+for reduced motion. Checked by Playwright and axe in CI on desktop and mobile.
 
 ```bash
-cargo run -p server --bin web-server
-# then open http://localhost:3001
+just play     # development server on http://localhost:5173
+just site     # production build into web/dist; `just serve` then serves it on :3001
 ```
 
-The dashboard runs bursts against a fresh in-process limiter; the limited routes
-above use the server's configured backend.
+Building it needs the wasm32 target and `wasm-bindgen-cli` at the crate's version:
+`rustup target add wasm32-unknown-unknown` and
+`cargo install wasm-bindgen-cli --version 0.2.130 --locked`.
 
 ---
 
@@ -173,6 +185,7 @@ above use the server's configured backend.
 - Rust 1.89 or newer via [rustup](https://rustup.rs/) (the minimum is checked in CI)
 - Docker (optional): for the Redis tests and the 3-node cluster
 - [just](https://github.com/casey/just) (optional): `cargo install just --locked`
+- Node.js 24 (optional): for the playground in `web/`
 
 ### Installation
 
@@ -184,7 +197,7 @@ cargo build --release
 cargo test --workspace
 
 cargo run -p server --bin demo        # terminal demo of every algorithm
-cargo run -p server --bin web-server  # server and dashboard on http://localhost:3001
+cargo run -p server --bin web-server  # API on http://localhost:3001
 ```
 
 ### Basic usage
@@ -347,6 +360,9 @@ cargo fmt --all -- --check
 
 # Starts Redis containers with testcontainers (needs Docker; CI runs these on every push)
 cargo test --workspace -- --ignored
+
+# The playground: types, log parser, end-to-end and accessibility (after `just site`)
+just test-web
 ```
 
 No test sleeps: time-dependent tests drive a `ManualClock`, and the Redis outage
@@ -361,7 +377,7 @@ These features are **not built yet**:
 - **Strategies on real Redis:** Lua scripts for lease, return and sync, and the
   strategies running on the 3-node Docker cluster
 - **Multi-tier limits:** per user, IP, endpoint and global limits combined
-- **WebSocket support:** live dashboard updates
+- **LLM token limits in the playground:** with the token-aware limiter (Phase 5)
 
 The full phase plan is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -376,7 +392,9 @@ The full phase plan is in [docs/ROADMAP.md](docs/ROADMAP.md).
 - **metrics** with the Prometheus exporter: metrics
 - **testcontainers** and **Docker Compose**: real Redis in tests, 3-node cluster
 - **wasm-bindgen**: WebAssembly bindings
-- **Tailwind CSS** and **Chart.js** (via CDN): dashboard UI
+- **Vite** and **TypeScript**: the playground, with no UI framework; charts drawn
+  directly on canvas and SVG
+- **Playwright** and **axe-core**: end-to-end and accessibility tests
 
 ---
 
