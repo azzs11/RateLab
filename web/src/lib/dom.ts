@@ -51,3 +51,9 @@ export function uid(prefix = "id"): string {
   ids += 1;
   return `${prefix}-${ids}`;
 }
+
+/** Resolves after the browser has painted the current DOM, so downloads and work that
+ * start after it never hold up the first paint. */
+export function afterPaint(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+}

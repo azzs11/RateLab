@@ -3,12 +3,14 @@
 
 import { figure } from "../components/figure";
 import { mark, surface } from "../lib/canvas";
-import { h } from "../lib/dom";
+import { afterPaint, h } from "../lib/dom";
 import { fmtInt, fmtMs, pretty } from "../lib/format";
 import { player, upperIndex } from "../lib/motion";
 import { palette, type Palette } from "../lib/palette";
 import { onThemeChange } from "../lib/theme";
-import { playerBar, rangeField, selectField } from "../lib/ui";
+import { playerBar } from "../lib/ui";
+import { choose, howTo, scrub, sentence } from "../lib/inline";
+import { masthead } from "../components/masthead";
 import { wasm, type Core } from "../lib/wasm";
 
 const ALGOS = ["token_bucket", "leaky_bucket", "fixed_window", "sliding_window", "gcra"];
@@ -253,9 +255,9 @@ function drawTimeline(ctx: CanvasRenderingContext2D, w: number, hgt: number, r: 
 }
 
 function panel(r: Run, p: Params, getT: () => number) {
-  const stateCanvas = surface(`${pretty(r.name)} state at the playhead`, 1.9, (s) =>
+  const stateCanvas = surface(`${pretty(r.name)} state at the playhead`, 3.6, (s) =>
     drawState(s.ctx, s.width, s.height, r, p, getT(), palette()),
-    170,
+    150,
   );
   const timeline = surface(
     `${pretty(r.name)}: ${r.admitted} of ${r.at.length} requests allowed; the exact rule allows ${r.exact}; at most ${r.worst} in any ${p.windowMs} ms.`,
@@ -269,7 +271,7 @@ function panel(r: Run, p: Params, getT: () => number) {
   const el = h(
     "section",
     { class: "lab-panel", "aria-label": pretty(r.name) },
-    h("h2", { class: "display lab-title" }, pretty(r.name)),
+    h("h2", { class: "lab-title" }, pretty(r.name)),
     h("div", { class: "lab-visuals" }, stateCanvas.el, timeline.el),
     h(
       "div",
@@ -310,6 +312,14 @@ function panel(r: Run, p: Params, getT: () => number) {
 }
 
 export default async function lab(root: HTMLElement, params: URLSearchParams) {
+  root.append(
+    masthead(
+      "Instrument 1 of 5",
+      "Algorithm lab",
+      `One algorithm, or two side by side, on the same traffic: every decision over ${SECS} seconds and what the algorithm remembered at each moment.`,
+    ),
+  );
+  await afterPaint();
   const core = await wasm();
   const p: Params = {
     a: ALGOS.includes(params.get("a") ?? "") ? (params.get("a") as string) : "token_bucket",
@@ -323,7 +333,7 @@ export default async function lab(root: HTMLElement, params: URLSearchParams) {
 
   let panels: ReturnType<typeof panel>[] = [];
   const stage = h("div", { class: "lab-stage" });
-  const how = h("div", { class: "lab-how" });
+  const how = h("div", { class: "lab-how prose" });
   let t = 0;
   const playback = player(
     (time) => {
@@ -342,81 +352,75 @@ export default async function lab(root: HTMLElement, params: URLSearchParams) {
     stage.replaceChildren(...panels.map((x) => x.el));
     stage.classList.toggle("two", panels.length === 2);
     how.replaceChildren(
-      ...names.map((n) =>
-        h("div", { class: "callout" }, h("h3", {}, `How ${pretty(n)} decides`), h("p", {}, HOW[n].replace(/`limit`/g, String(p.limit)))),
-      ),
+      ...names.flatMap((n) => [h("h2", {}, `How ${pretty(n).toLowerCase().replace("gcra", "GCRA")} decides`), h("p", {}, HOW[n].replace(/`limit`/g, String(p.limit)))]),
     );
     playback.seek(t);
   };
 
   const algoOptions = ALGOS.map((a) => ({ value: a, text: pretty(a) }));
-  const controls = h(
-    "div",
-    { class: "controls" },
-    selectField("Algorithm", algoOptions, p.a, (v) => {
-      p.a = v;
-      rebuild();
-    }).el,
-    selectField("Compare with", [{ value: "", text: "Nothing" }, ...algoOptions], p.b, (v) => {
-      p.b = v;
-      rebuild();
-    }).el,
-    selectField(
-      "Traffic",
-      Object.entries(PATTERNS).map(([value, text]) => ({ value, text })),
-      p.pattern,
-      (v) => {
-        p.pattern = v;
-        rebuild();
-      },
-    ).el,
-    rangeField("Limit", { min: 1, max: 50, step: 1, value: p.limit, format: (v) => `${v} per window` }, (v) => {
-      p.limit = v;
-      rebuild();
-    }).el,
-    selectField(
-      "Window",
-      [250, 500, 1000, 2000].map((v) => ({ value: String(v), text: fmtMs(v) })),
-      String(p.windowMs),
-      (v) => {
-        p.windowMs = Number(v);
-        rebuild();
-      },
-    ).el,
-    rangeField("Load", { min: 0.25, max: 5, step: 0.25, value: p.load, format: (v) => `${v}× the limit` }, (v) => {
-      p.load = v;
-      rebuild();
-    }).el,
-    rangeField("Seed", { min: 1, max: 50, step: 1, value: p.seed, format: (v) => `#${v}` }, (v) => {
-      p.seed = v;
-      rebuild();
-    }).el,
+  const traffic = Object.entries(PATTERNS).map(([value, text]) => ({ value, text: text.toLowerCase() }));
+  const fig = figure(
+    "1",
+    "An algorithm, deciding.",
+    "Dots were allowed and crosses refused. The top drawing is the algorithm's state at the playhead; the shaded area below is how much the key had left over time. Computed by the library in your browser.",
+    bar.el,
+    h("div", { class: "figure-body" }, stage),
   );
+  fig.classList.add("wide");
 
   root.append(
-    h(
-      "div",
-      { class: "page view-head" },
-      h("p", { class: "kicker" }, "Algorithm lab"),
-      h("h1", { class: "display" }, "Watch an algorithm ", h("span", { class: "hero-em", style: "display:inline" }, "think")),
-      h(
-        "p",
-        { class: "lede" },
-        `Pick traffic and a limit, press play, and scrub through ${SECS} seconds of decisions. The top drawing is the algorithm's state at the playhead; below is every decision it made.`,
-      ),
-    ),
-    h(
+        h(
       "div",
       { class: "page" },
-      figure(
-        "3",
-        "An algorithm, deciding",
-        "Filled dots were allowed, crosses were blocked. The shaded area is how much the key has left. Computed by the library in your browser.",
-        controls,
-        bar.el,
-        h("div", { class: "figure-body" }, stage),
+      h(
+        "div",
+        { class: "prose" },
+        sentence(
+          choose("Algorithm", algoOptions, p.a, (v) => {
+            p.a = v;
+            rebuild();
+          }).el,
+          ", compared with ",
+          choose("Compare with", [{ value: "", text: "nothing" }, ...algoOptions], p.b, (v) => {
+            p.b = v;
+            rebuild();
+          }).el,
+          ", at a limit of ",
+          scrub({ min: 1, max: 50, step: 1, value: p.limit, format: (v) => `${v}`, label: "Limit" }, (v) => {
+            p.limit = v;
+            rebuild();
+          }).el,
+          " per ",
+          choose(
+            "Window",
+            [250, 500, 1000, 2000].map((v) => ({ value: String(v), text: fmtMs(v) })),
+            String(p.windowMs),
+            (v) => {
+              p.windowMs = Number(v);
+              rebuild();
+            },
+          ).el,
+          ", under ",
+          choose("Traffic", traffic, p.pattern, (v) => {
+            p.pattern = v;
+            rebuild();
+          }).el,
+          " traffic at ",
+          scrub({ min: 0.25, max: 5, step: 0.25, value: p.load, format: (v) => `${v}×`, label: "Load, times the limit" }, (v) => {
+            p.load = v;
+            rebuild();
+          }).el,
+          " the limit (seed ",
+          scrub({ min: 1, max: 50, step: 1, value: p.seed, format: (v) => `${v}`, label: "Random seed" }, (v) => {
+            p.seed = v;
+            rebuild();
+          }).el,
+          ").",
+        ),
+        howTo(),
+        fig,
+        how,
       ),
-      how,
     ),
   );
   rebuild();

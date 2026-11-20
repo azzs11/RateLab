@@ -50,6 +50,45 @@ export interface StrategyResults {
   convergence: { strategy: string; rebalance_ms: Summary; never: number; under_first_second_pct: Summary }[];
 }
 
+export interface LocalResults {
+  machine: Machine;
+  timer: { resolution_ns: number; overhead_ns: number };
+}
+
+export interface MemoryResults {
+  machine: Machine;
+  rows: { algorithm: string; bytes_per_key_full_window: number; limit: number }[];
+}
+
+export interface TraceResults {
+  machine: Machine;
+  trace: { name: string; homepage: string; requests: number; clients: number; span_secs: number };
+  window_secs: number;
+  limit: number;
+  strategies: { strategy: string; nodes: number; error_pct: number; calls_per_1k: number }[];
+}
+
+export interface OverloadAgg {
+  goodput_pct: Summary;
+  p99_ms: Summary;
+  shed_pct: Summary;
+  timeout_pct: Summary;
+}
+
+export interface OverloadResults {
+  machine: Machine;
+  size: { run_secs: number; sim_seeds: number; real_seeds: number };
+  workers: number;
+  service_ms: number;
+  deadline_ms: number;
+  scenarios: {
+    name: string;
+    description: string;
+    rows: { limiter: string; sim: OverloadAgg; real: OverloadAgg | null }[];
+    series: { limiter: string; source: string; points: { t: number; offered_rps: number; ok_rps: number; possible_rps: number; limit: number | null; p99_ms: number }[] }[];
+  }[];
+}
+
 const cache = new Map<string, Promise<unknown>>();
 
 /** Loads `data/<name>.json`; resolves to null if it was not measured. */

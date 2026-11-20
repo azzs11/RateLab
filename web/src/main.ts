@@ -1,27 +1,26 @@
-import "@fontsource/instrument-serif/400-italic.css";
-import "@fontsource/instrument-serif/400.css";
 import "@fontsource-variable/inter/wght.css";
+import "@fontsource-variable/inter/wght-italic.css";
 import "@fontsource-variable/jetbrains-mono/wght.css";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/views.css";
 
-import serifItalic from "@fontsource/instrument-serif/files/instrument-serif-latin-400-italic.woff2?url";
-import { h, html, replace } from "./lib/dom";
-import { icon } from "./lib/icons";
+import inter from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
+import { afterPaint, h, html, replace } from "./lib/dom";
 import { applyStoredTheme, currentTheme, onThemeChange, toggleTheme } from "./lib/theme";
 import { wasm } from "./lib/wasm";
+import { loadResults, type Machine } from "./lib/data";
 import * as home from "./views/home";
 
 applyStoredTheme();
-// Start the WebAssembly download and the display font now, in parallel with rendering.
-void wasm();
+// Start the WebAssembly download once the first page has painted; the text font now.
+void afterPaint().then(() => wasm());
 document.head.append(
   Object.assign(document.createElement("link"), {
     rel: "preload",
     as: "font",
     type: "font/woff2",
-    href: serifItalic,
+    href: inter,
     crossOrigin: "anonymous",
   }),
 );
@@ -33,37 +32,45 @@ interface Route {
   path: string;
   label: string;
   title: string;
+  group: "essay" | "instrument" | "appendix";
   load: () => Promise<{ default: View }>;
 }
 
 const ROUTES: Route[] = [
-  { path: "", label: "Story", title: "Rate limiting, measured", load: () => Promise.resolve(home) },
-  { path: "lab", label: "Lab", title: "Algorithm lab", load: () => import("./views/lab") },
-  { path: "cluster", label: "Cluster", title: "Cluster simulator", load: () => import("./views/cluster") },
-  { path: "explorer", label: "Explorer", title: "Strategy explorer", load: () => import("./views/explorer") },
-  { path: "replay", label: "Replay", title: "Replay your logs", load: () => import("./views/replay") },
-  { path: "results", label: "Results", title: "Results", load: () => import("./views/results") },
+  { path: "", label: "Essay", title: "The price of exactness", group: "essay", load: () => Promise.resolve(home) },
+  { path: "lab", label: "Lab", title: "Algorithm lab", group: "instrument", load: () => import("./views/lab") },
+  { path: "cluster", label: "Cluster", title: "Cluster", group: "instrument", load: () => import("./views/cluster") },
+  { path: "explorer", label: "Explorer", title: "Strategy explorer", group: "instrument", load: () => import("./views/explorer") },
+  { path: "overload", label: "Overload", title: "Overload", group: "instrument", load: () => import("./views/overload") },
+  { path: "replay", label: "Replay", title: "Replay your logs", group: "instrument", load: () => import("./views/replay") },
+  { path: "results", label: "Results", title: "Results", group: "appendix", load: () => import("./views/results") },
 ];
 
 const REPO = "https://github.com/azzs11/distributed-rate-limiter";
 
 const app = document.getElementById("app")!;
 const nav = h("nav", { class: "nav", "aria-label": "Sections" });
-const themeBtn = h("button", { class: "icon-btn", type: "button", onclick: () => toggleTheme() });
+const themeBtn = h("button", { class: "theme-btn", type: "button", onclick: () => toggleTheme() });
 const main = h("main", { id: "main", tabindex: "-1" });
 
 function paintThemeButton() {
   const dark = currentTheme() === "dark";
-  themeBtn.replaceChildren(html(dark ? icon.sun() : icon.moon()));
+  themeBtn.textContent = dark ? "Light" : "Dark";
   themeBtn.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
 }
 paintThemeButton();
 onThemeChange(paintThemeButton);
 
 for (const r of ROUTES) {
+  if (r.path === "lab") nav.append(h("span", { class: "group", "aria-hidden": "true" }, "Instruments:"));
   nav.append(h("a", { href: `#/${r.path}`, "data-path": r.path }, r.label));
 }
 
+/** The mark: requests up to a window edge, the edge, and the ones after it. */
+const MARK =
+  '<svg viewBox="0 0 24 16" width="22" height="15" aria-hidden="true"><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 5v9M6 5v9M10 5v9"/><path d="M22 5v9M18 5v9" opacity=".4"/></g><path d="M14 1v15" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/></svg>';
+
+const measured = h("span", {});
 app.append(
   h(
     "header",
@@ -74,8 +81,8 @@ app.append(
       h(
         "a",
         { class: "brand", href: "#/" },
-        h("span", { class: "mark" }, "Ratelab"),
-        h("span", { class: "sub" }, "rate limiting, measured"),
+        h("span", { class: "mark" }, html(MARK), "Ratelab"),
+        h("span", { class: "sub" }, "a rate limiter that measures itself"),
       ),
       nav,
       themeBtn,
@@ -91,14 +98,22 @@ app.append(
       h(
         "p",
         {},
-        "Every number on this site is computed by the project's own Rust code: live in your browser, or by the benchmark in ",
+        "Written and built by ",
+        h("a", { href: "https://github.com/azzs11" }, "Akchhya Singh"),
+        ". Every number here comes from the project's own Rust code: computed in your browser as you read, or by the benchmark in ",
         h("a", { href: `${REPO}/blob/main/results/RESULTS.md` }, "results/RESULTS.md"),
         ".",
+        measured,
       ),
-      h("p", {}, h("a", { href: REPO }, "Source on GitHub"), " · MIT licence"),
+      h("p", {}, h("a", { href: REPO }, "Source"), " · MIT licence"),
     ),
   ),
 );
+void afterPaint()
+  .then(() => loadResults<{ machine: Machine }>("local"))
+  .then((l) => {
+  if (l) measured.textContent = ` Benchmark last run ${l.machine.measured_at.slice(0, 10)} at commit ${l.machine.git_commit.slice(0, 7)}.`;
+});
 
 /** Horizontally scrolling tables and code must be reachable by keyboard. */
 function focusableScrollers(scope: ParentNode) {
@@ -126,7 +141,7 @@ async function route() {
     if (a.dataset.path === r.path) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   }
-  document.title = r.path ? `${r.title} · Ratelab` : "Ratelab · rate limiting, measured";
+  document.title = r.path ? `${r.title} · Ratelab` : "Ratelab: the price of exactness in rate limiting";
 
   dispose?.();
   dispose = null;

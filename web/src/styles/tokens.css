@@ -1,25 +1,28 @@
 /*
- * Design tokens. Everything visual comes from here, so a family palette can be
- * dropped in later by changing this file only.
+ * Design tokens: a technical paper, printed in ink, annotated in pencil.
  *
- * Rules: one neutral base, one accent; "allowed" and "blocked" are the only semantic
- * colours and always come with a shape or icon; no gradients; WCAG AA contrast.
+ * - Paper and ink are near-neutral. Colour is reserved for data: "allowed" and
+ *   "blocked" (always paired with a shape or icon), plus one annotation colour (ochre)
+ *   for the playhead, callouts and leader lines: the marks a reader adds to a page.
+ * - Links are ink, underlined; the accent never carries body text.
+ * - One family (Inter) for prose and headings; JetBrains Mono for numbers, code and
+ *   figure labels. Italic only does an italic's job: titles, captions, emphasis.
+ * - No gradients, no shadows, no rounded panels. Structure comes from rules and space.
  */
 
 :root {
-  /* Type */
-  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
   --font-text: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  /* Kept so canvas code that reads it still gets a real family. */
+  --font-display: var(--font-text);
 
-  --step--1: clamp(0.8rem, 0.78rem + 0.1vw, 0.86rem);
-  --step-0: clamp(1rem, 0.96rem + 0.18vw, 1.08rem);
-  --step-1: clamp(1.2rem, 1.12rem + 0.4vw, 1.4rem);
-  --step-2: clamp(1.5rem, 1.32rem + 0.9vw, 2rem);
-  --step-3: clamp(2rem, 1.6rem + 2vw, 3.2rem);
-  --step-4: clamp(2.5rem, 1.7rem + 3.4vw, 4.6rem);
+  --step--2: 0.75rem;
+  --step--1: 0.8125rem;
+  --step-0: clamp(1rem, 0.97rem + 0.15vw, 1.0625rem);
+  --step-1: 1.1875rem;
+  --step-2: clamp(1.35rem, 1.25rem + 0.45vw, 1.6rem);
+  --step-3: clamp(1.8rem, 1.5rem + 1.3vw, 2.5rem);
 
-  /* Space (4 px grid) */
   --s-1: 0.25rem;
   --s-2: 0.5rem;
   --s-3: 0.75rem;
@@ -28,78 +31,81 @@
   --s-6: 2rem;
   --s-7: 3rem;
   --s-8: 4.5rem;
-  --s-9: 7rem;
+  --s-9: 6rem;
 
-  --radius: 10px;
-  --radius-sm: 6px;
-  --measure: 64ch;
-  --page: 1180px;
-  --gutter: clamp(16px, 4vw, 40px);
+  /* The page: a reading column with a margin for notes; figures may take both. */
+  --text: 37rem;
+  --margin: 15rem;
+  --margin-gap: 2.5rem;
+  --wide: calc(var(--text) + var(--margin-gap) + var(--margin));
+  --gutter: clamp(16px, 4vw, 48px);
+  --page: calc(var(--wide) + 2 * var(--gutter));
+  /* Legacy names used by figures. */
+  --measure: var(--text);
+  --radius: 2px;
+  --radius-sm: 2px;
 
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --dur: 240ms;
+  --dur: 160ms;
 
-  /* Light: warm paper and ink */
-  --bg: #f4efe6;
-  --surface: #fbf8f2;
-  --surface-2: #efe8dc;
-  --ink: #17161a;
-  --ink-2: #3c3a40;
-  --muted: #5f5b62;
-  --line: #d9d0c1;
-  --line-strong: #b9ad9a;
-  --accent: #2b37d6;
+  --bg: #fcfcfa;
+  --surface: #fcfcfa;
+  --surface-2: #f2f2ee;
+  --ink: #16161a;
+  --ink-2: #33333a;
+  --muted: #64646b;
+  --line: #e2e2dc;
+  --line-strong: #b9b9b1;
+  --accent: #9a5800;
   --accent-ink: #ffffff;
-  --accent-soft: #e3e5ff;
-  --allowed: #0b7a52;
-  --allowed-soft: #d7efe4;
-  --blocked: #b8321c;
-  --blocked-soft: #f6dcd5;
-  --focus: #2b37d6;
-  --shadow: 0 1px 0 rgba(23, 22, 26, 0.04), 0 12px 32px -18px rgba(23, 22, 26, 0.35);
+  --accent-soft: #f6ead7;
+  --allowed: #0a7349;
+  --allowed-soft: #dcefe4;
+  --blocked: #b0261a;
+  --blocked-soft: #f7dfdb;
+  --focus: #16161a;
+  --shadow: none;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0e0f12;
-    --surface: #15171c;
-    --surface-2: #1c1f26;
-    --ink: #eeeae2;
-    --ink-2: #cfcbc3;
-    --muted: #a4a29c;
-    --line: #2b2e36;
-    --line-strong: #444852;
-    --accent: #929bff;
-    --accent-ink: #0e0f12;
-    --accent-soft: #232853;
-    --allowed: #45cf94;
-    --allowed-soft: #12322a;
-    --blocked: #ff8068;
-    --blocked-soft: #3a1c17;
-    --focus: #929bff;
-    --shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 16px 40px -20px rgba(0, 0, 0, 0.8);
+    --bg: #141412;
+    --surface: #141412;
+    --surface-2: #1d1d1a;
+    --ink: #ecebe5;
+    --ink-2: #cfcec7;
+    --muted: #9b9a92;
+    --line: #2c2c28;
+    --line-strong: #4a4a44;
+    --accent: #e2a54b;
+    --accent-ink: #141412;
+    --accent-soft: #33281a;
+    --allowed: #4cc591;
+    --allowed-soft: #15302a;
+    --blocked: #ff8a76;
+    --blocked-soft: #3b1d18;
+    --focus: #ecebe5;
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0e0f12;
-  --surface: #15171c;
-  --surface-2: #1c1f26;
-  --ink: #eeeae2;
-  --ink-2: #cfcbc3;
-  --muted: #a4a29c;
-  --line: #2b2e36;
-  --line-strong: #444852;
-  --accent: #929bff;
-  --accent-ink: #0e0f12;
-  --accent-soft: #232853;
-  --allowed: #45cf94;
-  --allowed-soft: #12322a;
-  --blocked: #ff8068;
-  --blocked-soft: #3a1c17;
-  --focus: #929bff;
-  --shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 16px 40px -20px rgba(0, 0, 0, 0.8);
+  --bg: #141412;
+  --surface: #141412;
+  --surface-2: #1d1d1a;
+  --ink: #ecebe5;
+  --ink-2: #cfcec7;
+  --muted: #9b9a92;
+  --line: #2c2c28;
+  --line-strong: #4a4a44;
+  --accent: #e2a54b;
+  --accent-ink: #141412;
+  --accent-soft: #33281a;
+  --allowed: #4cc591;
+  --allowed-soft: #15302a;
+  --blocked: #ff8a76;
+  --blocked-soft: #3b1d18;
+  --focus: #ecebe5;
   color-scheme: dark;
 }

@@ -2,9 +2,10 @@
 // each was measured on. Nothing here is measured in the browser.
 
 import { loadResults, machineLine, type Machine, type StrategyResults, type Summary } from "../lib/data";
-import { h } from "../lib/dom";
+import { afterPaint, h } from "../lib/dom";
+import { masthead } from "../components/masthead";
 import { fmtInt, fmtNum, fmtPct, fmtRate, pretty } from "../lib/format";
-import { goodputChart, goodputLegend, type GoodputLine } from "../components/goodput";
+import { goodputChart, type GoodputLine } from "../components/goodput";
 
 const REPO = "https://github.com/azzs11/distributed-rate-limiter";
 
@@ -85,11 +86,15 @@ function block(id: string, title: string, intro: string, machine: Machine | null
     { class: "section", "aria-labelledby": id },
     h(
       "div",
-      { class: "page stack" },
-      h("h2", { class: "display results-title", id }, title),
-      h("p", {}, intro),
-      machine ? h("p", { class: "note mono" }, `Measured on ${machineLine(machine)}`) : null,
-      ...body,
+      { class: "page" },
+      h(
+        "div",
+        { class: "prose" },
+        h("h2", { id }, title),
+        intro ? h("p", {}, intro) : null,
+        machine ? h("aside", { class: "side" }, `Measured on ${machineLine(machine)}`) : null,
+        h("div", { class: "wide stack" }, ...body),
+      ),
     ),
   );
 }
@@ -149,7 +154,6 @@ function overloadBlock(o: Overload): HTMLElement {
         h("h3", {}, pretty(sc.name)),
         h("p", {}, `${sc.description.charAt(0).toUpperCase()}${sc.description.slice(1)}.`),
         goodputChart(lines, title),
-        goodputLegend(),
         h("figcaption", { class: "note" }, title),
       ),
       table(
@@ -180,6 +184,24 @@ function overloadBlock(o: Overload): HTMLElement {
 }
 
 export default async function results(root: HTMLElement) {
+  root.append(
+    masthead(
+      "Appendix",
+      "Results",
+      h(
+        "span",
+        {},
+        "Everything below comes from one command, ",
+        h("code", {}, "just results"),
+        ", read unchanged from the JSON files in results/. Each section names the machine and commit it was measured on. ",
+        h("a", { href: `${REPO}/blob/main/results/RESULTS.md` }, "Full tables"),
+        " · ",
+        h("a", { href: `${REPO}/tree/main/results` }, "raw JSON"),
+        ".",
+      ),
+    ),
+  );
+  await afterPaint();
   const [local, memory, cluster, strategies, traces, real, overload] = await Promise.all([
     loadResults<Local>("local"),
     loadResults<Memory>("memory"),
@@ -190,27 +212,7 @@ export default async function results(root: HTMLElement) {
     loadResults<Overload>("overload"),
   ]);
 
-  root.append(
-    h(
-      "div",
-      { class: "page view-head" },
-      h("p", { class: "kicker" }, "Results"),
-      h("h1", { class: "display" }, "Measured, ", h("span", { class: "hero-em", style: "display:inline" }, "not claimed")),
-      h(
-        "p",
-        { class: "lede" },
-        "Everything below comes from one command, just results, and is copied unchanged from the JSON files in results/. Each section names the machine and commit it was measured on.",
-      ),
-      h(
-        "p",
-        {},
-        h("a", { href: `${REPO}/blob/main/results/RESULTS.md` }, "Full tables in RESULTS.md"),
-        " · ",
-        h("a", { href: `${REPO}/tree/main/results` }, "Raw JSON"),
-      ),
-    ),
-  );
-
+  
   // Accuracy: worst window per algorithm and scenario.
   if (local) {
     const algos = [...new Set(local.accuracy.map((r) => r.algorithm))];

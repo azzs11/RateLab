@@ -3,12 +3,14 @@
 
 import { figure } from "../components/figure";
 import { mark, surface } from "../lib/canvas";
-import { h } from "../lib/dom";
+import { afterPaint, h } from "../lib/dom";
 import { fmtInt, fmtMs, fmtPct, pretty } from "../lib/format";
 import { player, upperIndex } from "../lib/motion";
 import { palette, STRATEGY_STYLE } from "../lib/palette";
 import { onThemeChange } from "../lib/theme";
-import { checkField, playerBar, rangeField, selectField } from "../lib/ui";
+import { playerBar } from "../lib/ui";
+import { choose, howTo, scrub, sentence, toggle } from "../lib/inline";
+import { masthead } from "../components/masthead";
 import { wasm, type Core } from "../lib/wasm";
 
 const STRATEGIES = ["central_exact", "local_split", "async_sync", "fixed_leasing", "adaptive_leasing"];
@@ -309,6 +311,14 @@ function readParams(q: URLSearchParams): Params {
 }
 
 export default async function cluster(root: HTMLElement, query: URLSearchParams) {
+  root.append(
+    masthead(
+      "Instrument 2 of 5",
+      "Cluster",
+      "Several servers enforcing one shared limit. Choose how they coordinate, then break things: skew their clocks, cut off the store, pile the traffic onto one node.",
+    ),
+  );
+  await afterPaint();
   const core = await wasm();
   const p = readParams(query);
   let r = run(core, p);
@@ -386,97 +396,57 @@ export default async function cluster(root: HTMLElement, query: URLSearchParams)
     history.replaceState(null, "", `#/cluster?${q}`);
   };
 
-  const controls = h(
-    "div",
-    { class: "controls" },
-    selectField("Strategy", STRATEGIES.map((s) => ({ value: s, text: pretty(s) })), p.strategy, (v) => {
-      p.strategy = v;
-      rerun();
-    }).el,
-    rangeField("Nodes", { min: 2, max: 8, step: 1, value: p.nodes, format: (v) => `${v}` }, (v) => {
-      p.nodes = v;
-      rerun();
-    }).el,
-    selectField("Traffic", Object.entries(PATTERNS).map(([value, text]) => ({ value, text })), p.pattern, (v) => {
-      p.pattern = v;
-      rerun();
-    }).el,
-    rangeField("Load", { min: 0.25, max: 5, step: 0.25, value: p.load, format: (v) => `${v}× the limit` }, (v) => {
-      p.load = v;
-      rerun();
-    }).el,
-    rangeField("Hot node", { min: 0, max: 95, step: 5, value: p.hot, format: (v) => (v === 0 ? "even spread" : `${v}% on node 1`) }, (v) => {
-      p.hot = v;
-      rerun();
-    }).el,
-    rangeField("One-way delay", { min: 0, max: 5000, step: 50, value: p.delayUs, format: (v) => fmtMs(v / 1000) }, (v) => {
-      p.delayUs = v;
-      rerun();
-    }).el,
-    rangeField("Clock skew", { min: 0, max: 100, step: 5, value: p.skewMs, format: (v) => (v === 0 ? "none" : `${v} ms per node`) }, (v) => {
-      p.skewMs = v;
-      rerun();
-    }).el,
-    h(
-      "div",
-      { class: "field" },
-      h("span", {}, "Failures"),
-      checkField("Store outage at 40–60%", p.outage, (v) => {
-        p.outage = v;
-        rerun();
-      }),
-      checkField("Fail closed", p.failClosed, (v) => {
-        p.failClosed = v;
-        rerun();
-      }),
-    ),
+  const re = <K extends keyof typeof p>(key: K) => (v: (typeof p)[K]) => {
+    p[key] = v;
+    rerun();
+  };
+  const controls = sentence(
+    scrub({ min: 2, max: 8, step: 1, value: p.nodes, format: (v) => `${v}`, label: "Nodes" }, re("nodes")).el,
+    " nodes share one limit using ",
+    choose("Strategy", STRATEGIES.map((x) => ({ value: x, text: pretty(x).toLowerCase() })), p.strategy, re("strategy")).el,
+    ". Traffic is ",
+    choose("Traffic", Object.entries(PATTERNS).map(([value, text]) => ({ value, text: text.toLowerCase() })), p.pattern, re("pattern")).el,
+    " at ",
+    scrub({ min: 0.25, max: 5, step: 0.25, value: p.load, format: (v) => `${v}×`, label: "Load, times the limit" }, re("load")).el,
+    " the limit, with ",
+    scrub({ min: 0, max: 95, step: 5, value: p.hot, format: (v) => (v === 0 ? "an even share" : `${v}%`), label: "Share of traffic on node 1" }, re("hot")).el,
+    " on node 1. Messages take ",
+    scrub({ min: 0, max: 5000, step: 50, value: p.delayUs, format: (v) => fmtMs(v / 1000), label: "One-way delay" }, re("delayUs")).el,
+    " each way, clocks drift by ",
+    scrub({ min: 0, max: 100, step: 5, value: p.skewMs, format: (v) => (v === 0 ? "nothing" : `${v} ms per node`), label: "Clock skew" }, re("skewMs")).el,
+    ", and the run ",
+    toggle("loses the store from 40% to 60%", p.outage, re("outage")),
+    ", during which nodes ",
+    toggle("fail closed", p.failClosed, re("failClosed")),
+    ".",
   );
 
-  root.append(
+  const fig = figure(
+    "1",
+    "A cluster, coordinating.",
+    `The project's deterministic simulator, in your browser. Pulses are slowed down to be visible (${VISUAL_TRAVEL_MS} ms of simulated time per trip); the real delay is the one in the sentence. Bars show the tokens each node holds.`,
+    bar.el,
     h(
       "div",
-      { class: "page view-head" },
-      h("p", { class: "kicker" }, "Cluster simulator"),
-      h("h1", { class: "display" }, "One limit, ", h("span", { class: "hero-em", style: "display:inline" }, "many nodes")),
+      { class: "figure-body cluster-body" },
+      h("div", { class: "cluster-diagram" }, diagram.el, about),
       h(
-        "p",
-        { class: "lede" },
-        "Choose how the nodes coordinate, then break things: skew their clocks, cut the store off, pile the traffic onto one node. The meter compares the cluster with one perfectly coordinated limiter.",
+        "dl",
+        { class: "cluster-meter", "aria-label": "Live meter" },
+        h("div", { class: "stat" }, h("dt", { class: "label" }, "Admitted"), h("dd", {}, meter.admitted)),
+        h("div", { class: "stat" }, h("dt", { class: "label" }, "One perfect limiter"), h("dd", {}, meter.ideal)),
+        h("div", { class: "stat" }, h("dt", { class: "label" }, "Difference"), h("dd", {}, meter.diff)),
+        h("div", { class: "stat" }, h("dt", { class: "label" }, "Error, whole run"), h("dd", {}, meter.error)),
+        h("div", { class: "stat" }, h("dt", { class: "label" }, "Store calls / 1k"), h("dd", {}, meter.calls)),
+        h("div", { class: "stat" }, h("dt", { class: "label" }, "p99 wait"), h("dd", {}, meter.wait)),
       ),
     ),
-    h(
-      "div",
-      { class: "page" },
-      figure(
-        "4",
-        "A cluster, coordinating",
-        `Runs the project's deterministic simulator in your browser. Message pulses are drawn slowed down (${VISUAL_TRAVEL_MS} ms of simulated time per trip); the real one-way delay is the setting above. Bars show the tokens each node holds.`,
-        controls,
-        bar.el,
-        h(
-          "div",
-          { class: "figure-body cluster-body" },
-          h("div", { class: "cluster-diagram" }, diagram.el, about),
-          h(
-            "div",
-            { class: "cluster-meter", "aria-label": "Live meter" },
-            h("div", { class: "stat" }, h("div", { class: "label" }, "Admitted"), meter.admitted),
-            h("div", { class: "stat" }, h("div", { class: "label" }, "Ideal"), meter.ideal),
-            h("div", { class: "stat" }, h("div", { class: "label" }, "Difference"), meter.diff),
-            h("div", { class: "stat" }, h("div", { class: "label" }, "Error"), meter.error, h("div", { class: "hint" }, "whole run")),
-            h("div", { class: "stat" }, h("div", { class: "label" }, "Calls / 1k"), meter.calls),
-            h("div", { class: "stat" }, h("div", { class: "label" }, "p99 wait"), meter.wait),
-          ),
-        ),
-        h(
-          "div",
-          { class: "figure-body bins" },
-          h("p", { class: "label" }, "Admitted per 100 ms: cluster (solid) vs ideal (dashed)"),
-          bins.el,
-        ),
-      ),
-      h("div", { class: "spacer" }),
-    ),
+    h("div", { class: "figure-body bins" }, h("p", { class: "label" }, "Admitted per 100 ms: cluster (solid) against one perfect limiter (dashed)"), bins.el),
+  );
+  fig.classList.add("wide");
+
+  root.append(
+        h("div", { class: "page" }, h("div", { class: "prose" }, controls, howTo(), fig)),
   );
   paintTotals();
   frame(0);

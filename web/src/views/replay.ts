@@ -5,6 +5,8 @@ import { figure } from "../components/figure";
 import { h, html } from "../lib/dom";
 import { fmtInt, fmtMs, fmtPct, pretty } from "../lib/format";
 import { icon } from "../lib/icons";
+import { masthead } from "../components/masthead";
+import { choose, sentence } from "../lib/inline";
 import { guessColumns, readTable, toArrays, type Parsed, type Table } from "../lib/logs";
 import { wasm, type Core } from "../lib/wasm";
 import type { ReplayReport } from "../wasm-pkg/wasm.js";
@@ -123,7 +125,7 @@ export default async function replay(root: HTMLElement) {
       analyse(true);
     });
     mapping.replaceChildren(
-      h("h2", { class: "display replay-step" }, "Which column is which?"),
+      h("h2", { class: "replay-step" }, "Which column is which?"),
       h(
         "div",
         { class: "controls replay-cols" },
@@ -159,61 +161,26 @@ export default async function replay(root: HTMLElement) {
     }, 30);
   }
 
-  const limitInput = h("input", { type: "number", id: "limit", min: 1, step: 1, value: 100 }) as HTMLInputElement;
-  const settings = h(
-    "div",
-    { class: "controls" },
-    h(
-      "div",
-      { class: "field" },
-      h("label", { for: "win" }, "Window"),
-      (() => {
-        const s = h("select", { id: "win" }) as HTMLSelectElement;
-        WINDOWS.forEach((w) => s.append(h("option", { value: String(w.ms) }, w.text)));
-        s.addEventListener("change", () => {
-          windowMs = Number(s.value);
-          analyse(true);
-        });
-        return s;
-      })(),
-    ),
-    h(
-      "div",
-      { class: "field" },
-      h("label", { for: "target" }, "Block at most"),
-      (() => {
-        const s = h("select", { id: "target" }) as HTMLSelectElement;
-        [0, 0.1, 1, 5].forEach((v) => {
-          const o = h("option", { value: String(v) }, `${v}% of requests`);
-          if (v === target) o.selected = true;
-          s.append(o);
-        });
-        s.addEventListener("change", () => {
-          target = Number(s.value);
-          analyse(true);
-        });
-        return s;
-      })(),
-    ),
-    h("div", { class: "field" }, h("label", { for: "limit" }, "Limit per key per window"), limitInput),
-    h(
-      "div",
-      { class: "field" },
-      h("label", { for: "nodes" }, "Nodes for strategies"),
-      (() => {
-        const s = h("select", { id: "nodes" }) as HTMLSelectElement;
-        [2, 3, 5, 8].forEach((v) => {
-          const o = h("option", { value: String(v) }, `${v} nodes`);
-          if (v === nodes) o.selected = true;
-          s.append(o);
-        });
-        s.addEventListener("change", () => {
-          nodes = Number(s.value);
-          analyse(false);
-        });
-        return s;
-      })(),
-    ),
+  const limitInput = h("input", { type: "number", id: "limit", "aria-label": "Your own limit", min: 1, step: 1, value: 100 }) as HTMLInputElement;
+  const settings = sentence(
+    "Find the smallest limit per key per ",
+    choose("Window", WINDOWS.map((w) => ({ value: String(w.ms), text: w.text })), String(windowMs), (v) => {
+      windowMs = Number(v);
+      analyse(true);
+    }).el,
+    " that blocks at most ",
+    choose("Block at most", [0, 0.1, 1, 5].map((v) => ({ value: String(v), text: `${v}%` })), String(target), (v) => {
+      target = Number(v);
+      analyse(true);
+    }).el,
+    " of the requests, or try your own limit of ",
+    h("span", { class: "inline-input" }, limitInput),
+    ", shared across ",
+    choose("Nodes for strategies", [2, 3, 5, 8].map((v) => ({ value: String(v), text: `${v} nodes` })), String(nodes), (v) => {
+      nodes = Number(v);
+      analyse(false);
+    }).el,
+    ".",
   );
   limitInput.addEventListener("change", () => analyse(false));
 
@@ -242,8 +209,8 @@ export default async function replay(root: HTMLElement) {
     results.replaceChildren(
       h(
         "div",
-        { class: "callout replay-reco" },
-        h("p", { class: "label" }, "Recommendation"),
+        { class: "replay-reco" },
+        h("p", { class: "label" }, "Recommended limit"),
         h(
           "p",
           { class: "replay-big" },
@@ -297,29 +264,28 @@ export default async function replay(root: HTMLElement) {
     );
   }
 
+  const fig = figure(
+    "1",
+    "A log, replayed.",
+    "Your file is read and replayed by WebAssembly inside this page. Nothing is sent anywhere.",
+    h("div", { class: "figure-body stack" }, drop, fileInput, h("div", { class: "row" }, sampleBtn), status),
+  );
   root.append(
-    h(
-      "div",
-      { class: "page view-head" },
-      h("p", { class: "kicker" }, "Replay"),
-      h("h1", { class: "display" }, "Your traffic, ", h("span", { class: "hero-em", style: "display:inline" }, "every algorithm")),
-      h(
-        "p",
-        { class: "lede" },
-        "Choosing a limit by guessing is how rate limits end up blocking good customers. Load an access log and see what each algorithm would have done with it, and which limit keeps blocking under your target.",
-      ),
+    masthead(
+      "Instrument 5 of 5",
+      "Replay your logs",
+      "Guessing a limit is how rate limits end up blocking good customers. Load an access log to see what each algorithm would have done with it, and which limit keeps blocking under your target.",
     ),
     h(
       "div",
       { class: "page replay-page" },
-      figure(
-        "6",
-        "A log, replayed",
-        "Your file is read and replayed by WebAssembly inside this page. Nothing is sent to a server.",
-        h("div", { class: "figure-body stack" }, drop, fileInput, h("div", { class: "row" }, sampleBtn), status),
+      h(
+        "div",
+        { class: "prose" },
+        fig,
         h("div", { class: "figure-body" }, mapping),
         settings,
-        h("div", { class: "figure-body" }, results),
+        h("div", { class: "wide" }, results),
       ),
     ),
   );

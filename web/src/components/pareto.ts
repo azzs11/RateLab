@@ -33,8 +33,9 @@ export function paretoChart(
   points: ParetoPoint[],
   opts: { title: string; onPick?: (p: ParetoPoint) => void; highlight?: string; selected?: string },
 ): SVGSVGElement {
-  const W = 720;
-  const H = 420;
+  const narrow = window.innerWidth < 600;
+  const W = narrow ? 420 : 720;
+  const H = narrow ? 360 : 420;
   const L = 64;
   const R = 20;
   const T = 20;

@@ -1,16 +1,15 @@
-// Fig. 1: the boundary attack, live. Fixed window, sliding window and GCRA receive the
-// same requests: `limit` just before a window edge and `limit` just after it.
+// Figure 1: the boundary attack, live. Fixed window, sliding window and GCRA receive the
+// same requests: `limit` just before a window edge and `limit` just after it. When a
+// lane lets more than the limit through in one second, the figure marks where.
 
 import type { Core } from "../lib/wasm";
-import { h, html } from "../lib/dom";
+import { h } from "../lib/dom";
 import { mark, surface } from "../lib/canvas";
-import { icon } from "../lib/icons";
 import { player } from "../lib/motion";
 import { palette } from "../lib/palette";
 import { onThemeChange } from "../lib/theme";
 import { pretty } from "../lib/format";
 
-const LIMIT = 10;
 const WINDOW_MS = 1000;
 const SECS = 6;
 const LANES = ["fixed_window", "sliding_window", "gcra"] as const;
@@ -56,64 +55,71 @@ function worstSoFar(lane: Lane, t: number): number {
   return best;
 }
 
-export function attackFigure(core: Core): { el: HTMLElement; dispose: () => void } {
-  const traffic = core.Traffic.generate("boundary_attack", 0, SECS, LIMIT, WINDOW_MS, 1, 1);
+function build(core: Core, limit: number): Lane[] {
+  const traffic = core.Traffic.generate("boundary_attack", 0, SECS, limit, WINDOW_MS, 1, 1);
   const at = Float64Array.from(traffic.atMs());
-  const lanes: Lane[] = LANES.map((name) => {
-    const run = core.LabRun.run(name, LIMIT, WINDOW_MS, traffic, 0, 1000);
+  const lanes = LANES.map((name) => {
+    const run = core.LabRun.run(name, limit, WINDOW_MS, traffic, 0, 1000);
     const allowed = Uint8Array.from(run.allowed());
     const lane = { name, at, allowed, stack: stacks(at, allowed), worst: run.worstWindow() };
     run.free();
     return lane;
   });
   traffic.free();
+  return lanes;
+}
 
-  const counters = lanes.map(() => h("span", { class: "num" }, "0"));
+export interface AttackFigure {
+  el: HTMLElement;
+  /** Rebuilds for a new limit and replays from the start. */
+  setLimit: (limit: number) => void;
+  /** Worst one-second count per lane for the current limit, keyed by algorithm. */
+  worst: () => Record<string, number>;
+  dispose: () => void;
+}
+
+export function attackFigure(core: Core, initialLimit = 10): AttackFigure {
+  let limit = initialLimit;
+  let lanes = build(core, limit);
+
+  const counters = LANES.map(() => h("td", { class: "n" }, "0"));
   const legend = h(
-    "div",
+    "table",
     { class: "attack-legend" },
-    ...lanes.map((lane, i) =>
-      h(
-        "div",
-        { class: "attack-row" },
-        h("span", { class: "attack-name" }, pretty(lane.name)),
-        h(
-          "span",
-          { class: "attack-count" },
-          "most in any 1 s: ",
-          counters[i],
-          h("span", { class: "muted" }, ` / limit ${LIMIT}`),
-        ),
-      ),
-    ),
+    h("caption", { class: "visually-hidden" }, "Most requests admitted in any one second, so far"),
+    h("thead", {}, h("tr", {}, h("th", { scope: "col" }, "Algorithm"), h("th", { scope: "col", class: "n" }, "Most in any 1 s, so far"))),
+    h("tbody", {}, ...LANES.map((name, i) => h("tr", {}, h("th", { scope: "row" }, pretty(name)), counters[i]))),
   );
   const live = h("p", { class: "visually-hidden", "aria-live": "polite" });
 
   let t = 0;
   const canvas = surface(
-    `Timeline of the boundary attack. Fixed window admits up to ${lanes[0].worst} requests in one second, sliding window ${lanes[1].worst}, GCRA ${lanes[2].worst}; the limit is ${LIMIT}.`,
-    2.1,
+    "Timeline of the boundary attack",
+    2.3,
     (s) => {
       const p = palette();
       const { ctx, width, height } = s;
-      const padL = 8;
-      const padR = 8;
-      const laneH = (height - 24) / lanes.length;
+      const narrow = width < 560;
+      const padL = narrow ? 8 : 112;
+      const padR = 12;
+      const laneH = (height - 26) / lanes.length;
       const x = (ms: number) => padL + (ms / (SECS * 1000)) * (width - padL - padR);
-      // Window edges.
       ctx.font = `11px ${p.mono}`;
       ctx.fillStyle = p.muted;
+      ctx.textBaseline = "alphabetic";
       for (let w = 0; w <= SECS; w++) {
         const xx = x(w * WINDOW_MS);
-        ctx.strokeStyle = w % 2 === 1 ? p.lineStrong : p.line;
-        ctx.setLineDash(w % 2 === 1 ? [] : [3, 4]);
+        ctx.strokeStyle = p.line;
         ctx.beginPath();
         ctx.moveTo(xx, 0);
-        ctx.lineTo(xx, height - 20);
+        ctx.lineTo(xx, height - 22);
         ctx.stroke();
-        ctx.setLineDash([]);
-        if (w < SECS) ctx.fillText(`${w}s`, xx + 3, height - 6);
+        ctx.textAlign = w === SECS ? "right" : "left";
+        ctx.fillText(`${w} s`, w === SECS ? xx - 2 : xx + 3, height - 6);
+        ctx.textAlign = "left";
       }
+      const r = Math.max(2, Math.min(3.4, (laneH - 30) / (limit * 2.3)));
+      const gap = r * 2.25;
       lanes.forEach((lane, li) => {
         const top = li * laneH;
         const base = top + laneH - 8;
@@ -122,8 +128,10 @@ export function attackFigure(core: Core): { el: HTMLElement; dispose: () => void
         ctx.moveTo(padL, base + 4);
         ctx.lineTo(width - padR, base + 4);
         ctx.stroke();
-        const r = Math.max(2.2, Math.min(3.6, (laneH - 24) / (LIMIT * 2.3)));
-        const gap = r * 2.25;
+        ctx.font = `500 12px ${p.text}`;
+        ctx.fillStyle = p.ink;
+        if (narrow) ctx.fillText(pretty(lane.name), padL + 4, top + 14);
+        else ctx.fillText(pretty(lane.name), 0, base);
         for (let i = 0; i < lane.at.length && lane.at[i] <= t; i++) {
           const ok = lane.allowed[i] === 1;
           // The two waves are 2 ms apart, too close to see: each is drawn on its side
@@ -135,30 +143,48 @@ export function attackFigure(core: Core): { el: HTMLElement; dispose: () => void
           const yy = base - lane.stack[i] * gap - r;
           mark(ctx, xx, yy, r, ok, p.allowed, p.blocked);
         }
+        // Annotation: where this lane broke the limit.
+        const n = worstSoFar(lane, t);
+        if (n > limit) {
+          const edge = x(WINDOW_MS);
+          const left = edge - (gap + 2) - r - 3;
+          const right = edge + (gap + 2) + r + 3;
+          const y = base - limit * gap - r - 6;
+          ctx.strokeStyle = p.accent;
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(left, y + 5);
+          ctx.lineTo(left, y);
+          ctx.lineTo(right, y);
+          ctx.lineTo(right, y + 5);
+          ctx.moveTo(right, y);
+          ctx.lineTo(right + 18, y - 8);
+          ctx.stroke();
+          ctx.lineWidth = 1;
+          ctx.fillStyle = p.accent;
+          ctx.font = `italic 500 12px ${p.text}`;
+          ctx.fillText(width < 560 ? `${n} in 1 s` : `${n} let through within one second (limit ${limit})`, right + 22, y - 5);
+        }
       });
-      // Lane labels on a pill, drawn last so the marks never cover them.
-      ctx.font = `600 11px ${p.text}`;
-      lanes.forEach((lane, li) => {
-        const label = pretty(lane.name);
-        const tw = ctx.measureText(label).width;
-        ctx.fillStyle = p.surface;
-        ctx.globalAlpha = 0.92;
-        ctx.fillRect(padL + 1, li * laneH + 3, tw + 8, 16);
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = p.ink2;
-        ctx.fillText(label, padL + 5, li * laneH + 15);
-      });
-      // Playhead.
-      ctx.strokeStyle = p.accent;
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = p.ink;
+      ctx.globalAlpha = 0.5;
       ctx.beginPath();
       ctx.moveTo(x(t), 0);
-      ctx.lineTo(x(t), height - 20);
+      ctx.lineTo(x(t), height - 22);
       ctx.stroke();
-      ctx.lineWidth = 1;
+      ctx.globalAlpha = 1;
     },
-    220,
+    230,
   );
+
+  const describe = () =>
+    canvas.surface.canvas.setAttribute(
+      "aria-label",
+      `Timeline of the boundary attack with a limit of ${limit} per second. Most admitted in any one second: ${lanes
+        .map((l) => `${pretty(l.name)} ${l.worst}`)
+        .join(", ")}.`,
+    );
+  describe();
 
   let lastAnnounced = "";
   const update = (time: number) => {
@@ -167,7 +193,7 @@ export function attackFigure(core: Core): { el: HTMLElement; dispose: () => void
     lanes.forEach((lane, i) => {
       const n = worstSoFar(lane, t);
       counters[i].textContent = String(n);
-      counters[i].parentElement?.classList.toggle("over", n > LIMIT);
+      counters[i].classList.toggle("over", n > limit);
     });
     const text = lanes.map((l, i) => `${pretty(l.name)} ${counters[i].textContent}`).join(", ");
     if (!playback.playing && text !== lastAnnounced) {
@@ -177,14 +203,13 @@ export function attackFigure(core: Core): { el: HTMLElement; dispose: () => void
   };
 
   const playBtn = h("button", { class: "btn ghost", type: "button" });
-  // `wanted` is what the visitor chose; visibility only pauses temporarily.
   let wanted = true;
   let visible = true;
   const playback = player(update, {
     duration: SECS * 1000,
     loop: true,
     onState: (playing) => {
-      playBtn.replaceChildren(html(playing ? icon.pause() : icon.play()), playing ? "Pause" : "Play");
+      playBtn.textContent = playing ? "Pause" : "Play";
       playBtn.setAttribute("aria-pressed", String(playing));
     },
   });
@@ -196,7 +221,7 @@ export function attackFigure(core: Core): { el: HTMLElement; dispose: () => void
     wanted = !playback.playing;
     sync();
   });
-  const replay = h(
+  const again = h(
     "button",
     {
       class: "btn ghost",
@@ -207,8 +232,7 @@ export function attackFigure(core: Core): { el: HTMLElement; dispose: () => void
         sync();
       },
     },
-    html(icon.restart()),
-    "Attack again",
+    "Start again",
   );
 
   const stopTheme = onThemeChange(() => canvas.redraw());
@@ -216,12 +240,11 @@ export function attackFigure(core: Core): { el: HTMLElement; dispose: () => void
     "div",
     { class: "attack" },
     canvas.el,
-    legend,
-    h("div", { class: "row attack-actions" }, playBtn, replay, live),
+    h("div", { class: "attack-foot" }, legend, h("div", { class: "row" }, playBtn, again)),
+    live,
   );
   playback.seek(0);
   sync();
-  // Pause while scrolled out of view; resume when back, if it was playing.
   const io = new IntersectionObserver(([entry]) => {
     visible = entry.isIntersecting;
     sync();
@@ -229,6 +252,15 @@ export function attackFigure(core: Core): { el: HTMLElement; dispose: () => void
   requestAnimationFrame(() => io.observe(el));
   return {
     el,
+    setLimit: (next) => {
+      limit = next;
+      lanes = build(core, limit);
+      describe();
+      playback.seek(0);
+      wanted = true;
+      sync();
+    },
+    worst: () => Object.fromEntries(lanes.map((l) => [l.name, l.worst])),
     dispose: () => {
       playback.dispose();
       canvas.dispose();

@@ -9,12 +9,12 @@ export function figure(
 ): HTMLElement {
   return h(
     "figure",
-    { class: "figure", style: "margin:0" },
+    { class: "figure" },
     ...body,
     h(
       "figcaption",
       { class: "figure-caption" },
-      h("span", { class: "fig" }, `FIG. ${number}`),
+      h("span", { class: "fig" }, `Figure ${number}.`),
       h("em", {}, title),
       typeof caption === "string" ? h("span", {}, caption) : caption,
     ),

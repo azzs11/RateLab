@@ -24,7 +24,7 @@ export const fmtRate = (perSec: number): string => {
 };
 
 /** snake_case → "Snake case" for display. */
+const NAMES: Record<string, string> = { gcra: "GCRA", aimd: "AIMD", gradient2: "Gradient2" };
+
 export const pretty = (name: string): string =>
-  name === "gcra"
-    ? "GCRA"
-    : name.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+  NAMES[name] ?? name.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());

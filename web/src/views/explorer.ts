@@ -4,9 +4,11 @@
 import { figure } from "../components/figure";
 import { paretoChart, paretoLegend, type ParetoPoint } from "../components/pareto";
 import { loadResults, machineLine, type StrategyResults, type StrategyRow, type Summary } from "../lib/data";
-import { h, html } from "../lib/dom";
+import { afterPaint, h, html } from "../lib/dom";
 import { fmtInt, fmtPct, pretty } from "../lib/format";
 import { icon } from "../lib/icons";
+import { masthead } from "../components/masthead";
+import { choose, sentence } from "../lib/inline";
 
 const ORDER = ["central_exact", "local_split", "async_sync", "fixed_leasing", "adaptive_leasing"];
 
@@ -56,21 +58,16 @@ function beatsAdaptive(rows: StrategyRow[]) {
 }
 
 export default async function explorer(root: HTMLElement, params: URLSearchParams) {
-  const data = await loadResults<StrategyResults>("strategies");
   root.append(
-    h(
-      "div",
-      { class: "page view-head" },
-      h("p", { class: "kicker" }, "Strategy explorer"),
-      h("h1", { class: "display" }, "The price of ", h("span", { class: "hero-em", style: "display:inline" }, "exactness")),
-      h(
-        "p",
-        { class: "lede" },
-        "Every point is one coordination strategy on one traffic pattern, averaged over several seeds by the benchmark. Lower left is better: fewer calls to the shared store and less admission error.",
-      ),
+    masthead(
+      "Instrument 3 of 5",
+      "Strategy explorer",
+      "Every coordination strategy on every traffic pattern, from the benchmark. Each point is one strategy on one pattern, averaged over several seeds; any point can be replayed in the cluster instrument.",
     ),
   );
-  if (!data) {
+  await afterPaint();
+  const data = await loadResults<StrategyResults>("strategies");
+    if (!data) {
     root.append(h("div", { class: "page" }, h("p", { class: "error-box" }, "The strategy benchmark has not been run for this build.")));
     return () => {};
   }
@@ -94,7 +91,7 @@ export default async function explorer(root: HTMLElement, params: URLSearchParam
     const f = focus;
     detail.replaceChildren(
       h("p", { class: "label" }, `${f.nodes} nodes · ${f.scenario.replace(/_/g, " ")}`),
-      h("h2", { class: "display explorer-title" }, pretty(f.strategy)),
+      h("h2", { class: "explorer-title" }, pretty(f.strategy)),
       h(
         "dl",
         { class: "explorer-dl" },
@@ -104,7 +101,7 @@ export default async function explorer(root: HTMLElement, params: URLSearchParam
         h("div", {}, h("dt", {}, "p99 wait"), h("dd", { class: "num" }, `${spread(f.p99_us, 0)} µs`)),
         h("div", {}, h("dt", {}, "Peak / limit"), h("dd", { class: "num" }, spread(f.worst_window_ratio))),
       ),
-      h("a", { class: "btn accent", href: replayLink(f, data) }, "Replay in the cluster simulator ", html(icon.arrow())),
+      h("a", { class: "btn", href: replayLink(f, data) }, "Replay in the cluster instrument ", html(icon.arrow())),
       h(
         "p",
         { class: "note" },
@@ -165,9 +162,9 @@ export default async function explorer(root: HTMLElement, params: URLSearchParam
       );
     const losses = beatsAdaptive(data.matrix);
     tables.replaceChildren(
-      pivot(`Admission error, ${nodes} nodes (%, best in bold)`, (r) => r.error_pct.mean.toFixed(2), (r) => r.error_pct.mean),
+      pivot(`Admission error, ${nodes} nodes (%, lowest in bold)`, (r) => r.error_pct.mean.toFixed(2), (r) => r.error_pct.mean),
       pivot(`Store calls per 1,000 decisions, ${nodes} nodes`, (r) => fmtInt(r.calls_per_1k.mean), (r) => r.calls_per_1k.mean),
-      h("h2", { class: "display explorer-sub" }, "Where adaptive leasing loses"),
+      h("h2", { class: "explorer-sub" }, "Where adaptive leasing loses"),
       h(
         "p",
         {},
@@ -212,38 +209,46 @@ export default async function explorer(root: HTMLElement, params: URLSearchParam
     );
   };
 
-  const nodeSwitch = h("div", { class: "segmented", role: "group", "aria-label": "Cluster size" });
-  for (const n of nodeOptions) {
-    const b = h("button", { type: "button", "aria-pressed": String(n === nodes) }, `${n} node${n === 1 ? "" : "s"}`);
-    b.addEventListener("click", () => {
-      nodes = n;
-      nodeSwitch.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  const nodeChoice = choose(
+    "Cluster size",
+    nodeOptions.map((n) => ({ value: String(n), text: `${n} node${n === 1 ? "" : "s"}` })),
+    String(nodes),
+    (v) => {
+      nodes = Number(v);
       focus = null;
       paintChart();
       paintDetail();
       paintTables();
-    });
-    nodeSwitch.append(b);
-  }
-  const scenarioSelect = h("select", { "aria-label": "Highlight a traffic pattern" }) as HTMLSelectElement;
-  scenarioSelect.append(h("option", { value: "" }, "All traffic patterns"), ...scenarios.map((s) => h("option", { value: s }, s.replace(/_/g, " "))));
-  scenarioSelect.addEventListener("change", () => {
-    scenario = scenarioSelect.value;
-    paintChart();
-  });
+    },
+  );
+  const scenarioChoice = choose(
+    "Highlight a traffic pattern",
+    [{ value: "", text: "every traffic pattern" }, ...scenarios.map((x) => ({ value: x, text: x.replace(/_/g, " ") }))],
+    scenario,
+    (v) => {
+      scenario = v;
+      paintChart();
+    },
+  );
 
+  const fig = figure(
+    "1",
+    "Store calls against admission error.",
+    `From results/strategies.json: ${data.size.secs} s per run, ${data.size.seeds} seeds, a limit of ${data.limit} per second per key, ${data.keys} keys, a simulated one-way delay of ${data.network.one_way_us} µs plus up to ${data.network.jitter_us} µs. Measured on ${machineLine(data.machine)}. Down and to the left is better.`,
+    h("div", { class: "figure-body explorer-body" }, chartBox, detail),
+  );
+  fig.classList.add("wide");
   root.append(
     h(
       "div",
       { class: "page" },
-      figure(
-        "5",
-        "Store calls against admission error",
-        `From results/strategies.json: ${data.size.secs} s per run, ${data.size.seeds} seeds, limit ${data.limit} per second per key, ${data.keys} keys, simulated one-way delay ${data.network.one_way_us} µs + up to ${data.network.jitter_us} µs. Measured on ${machineLine(data.machine)}.`,
-        h("div", { class: "controls explorer-controls" }, nodeSwitch, h("div", { class: "field" }, scenarioSelect)),
-        h("div", { class: "figure-body explorer-body" }, chartBox, detail),
+      h(
+        "div",
+        { class: "prose" },
+        sentence("Show ", nodeChoice.el, ", highlighting ", scenarioChoice.el, "."),
+        fig,
+        h("div", { class: "explorer-tables wide" }, tables),
       ),
-      h("div", { class: "explorer-tables" }, tables),
     ),
   );
   paintChart();
