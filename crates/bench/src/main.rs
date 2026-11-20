@@ -3,6 +3,8 @@
 //! - `local`: in-process accuracy, latency, throughput and fairness → `results/local.json`
 //! - `traces`: a public request log through every algorithm and strategy → `results/traces.json`
 //! - `strategies`: the coordination strategies in the simulator → `results/strategies.json`
+//! - `llm`: token limits on a real LLM trace (downloaded into memory) and synthetic
+//!   requests, simulated and on the real layer → `results/llm.json`
 //! - `overload`: concurrency limits in front of a backend with limited capacity, simulated
 //!   and on the real Tower layer → `results/overload.json`
 //! - `report`: `results/*.json` → `results/RESULTS.md` and the README's results table
@@ -47,6 +49,20 @@ enum Command {
         #[arg(long, default_value = "results/strategies.json")]
         out: PathBuf,
     },
+    /// Token limits for LLM traffic: estimate-only, reserve-max and
+    /// admit-then-reconcile on the Azure LLM trace (downloaded into memory, never
+    /// saved) and on synthetic requests, plus a real-time check on the server's layer.
+    Llm {
+        /// One seed, a short synthetic run and one real-time minute.
+        #[arg(long)]
+        quick: bool,
+        /// Skip the real-time check.
+        #[arg(long)]
+        sim_only: bool,
+        /// Output file.
+        #[arg(long, default_value = "results/llm.json")]
+        out: PathBuf,
+    },
     /// No limit, static, AIMD and Gradient2 concurrency limits under overload, in the
     /// simulator and on the real Tower layer (in real time: about 5 minutes).
     Overload {
@@ -88,6 +104,11 @@ fn main() -> anyhow::Result<()> {
         Command::Local { quick, out } => run_local(quick, &out),
         Command::Strategies { quick, out } => run_strategies(quick, &out),
         Command::Traces { quick, out } => run_traces(quick, &out),
+        Command::Llm {
+            quick,
+            sim_only,
+            out,
+        } => run_llm(quick, sim_only, &out),
         Command::Overload {
             quick,
             sim_only,
@@ -176,6 +197,67 @@ fn run_strategies(quick: bool, out: &std::path::Path) -> anyhow::Result<()> {
         },
     )?;
     step(&format!("wrote {}", out.display()));
+    Ok(())
+}
+
+fn run_llm(quick: bool, sim_only: bool, out: &std::path::Path) -> anyhow::Result<()> {
+    use bench::llm::{self, LlmResults, LlmSize};
+    let size = if quick {
+        LlmSize::quick()
+    } else {
+        LlmSize::full()
+    };
+    let started = Instant::now();
+    let step = |name: &str| eprintln!("[{:>6.1} s] {name}", started.elapsed().as_secs_f64());
+    let rows = llm::fetch_azure(&step)?;
+    step(&format!("{} requests in the trace", rows.len()));
+    let first = llm::requests(&rows, 1);
+    let azure = llm::scenario(
+        "azure_2023",
+        "every request to two Azure LLM services (code and conversation) over one hour in November 2023, with their real input and output token counts",
+        size.seeds,
+        |seed| llm::requests(&rows, seed),
+        &step,
+    );
+    let secs = size.synthetic_secs;
+    let synthetic = llm::scenario(
+        "synthetic",
+        "Poisson arrivals at the trace's rate, with the same mean prompt and answer lengths per service but heavy-tailed (Pareto) answers",
+        size.seeds,
+        |seed| llm::synthetic_requests(seed, secs, &first),
+        &step,
+    );
+    let real = if sim_only {
+        None
+    } else {
+        Some(llm::real_check(&first, size.real_minutes, &step)?)
+    };
+    drop(rows);
+    write_json(
+        out,
+        &LlmResults {
+            schema: SCHEMA,
+            machine: Machine::detect(),
+            size,
+            files: [llm::AZURE_CODE, llm::AZURE_CONV]
+                .iter()
+                .map(|f| (f.url.to_owned(), f.sha256.to_owned()))
+                .collect(),
+            homepage: llm::AZURE_HOMEPAGE.to_owned(),
+            citation: llm::AZURE_CITATION.to_owned(),
+            tenants: llm::TENANTS,
+            window_secs: llm::WINDOW_SECS,
+            target_blocked_pct: llm::TARGET_BLOCKED_PCT,
+            prior_output: llm::PRIOR_OUTPUT,
+            streaming_ms: (llm::FIRST_TOKEN_MS, llm::PER_TOKEN_MS),
+            scenarios: vec![azure, synthetic],
+            real,
+        },
+    )?;
+    step(&format!(
+        "wrote {} (the downloaded trace is gone)",
+        out.display()
+    ));
     Ok(())
 }
 
@@ -282,6 +364,7 @@ fn run_report(dir: &std::path::Path, readme: &std::path::Path) -> anyhow::Result
         traces: read_json(&dir.join("traces.json"))?,
         real_strategies: read_json(&dir.join("real_strategies.json"))?,
         overload: read_json(&dir.join("overload.json"))?,
+        llm: read_json(&dir.join("llm.json"))?,
     };
     for (name, svg) in report::charts(&inputs) {
         let path = dir.join(&name);

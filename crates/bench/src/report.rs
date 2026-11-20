@@ -4,6 +4,7 @@
 //! each section names the machine and commit it was measured on.
 
 use crate::cluster::ClusterResults;
+use crate::llm::LlmResults;
 use crate::local::{ACCURACY_KEYS, ACCURACY_LIMIT, Scenario, TENANTS};
 use crate::machine::Machine;
 use crate::overload::{Agg, OverloadResults, Row as OverloadRow};
@@ -37,6 +38,8 @@ pub struct Inputs {
     pub real_strategies: Option<RealStrategyResults>,
     /// `overload.json`.
     pub overload: Option<OverloadResults>,
+    /// `llm.json`.
+    pub llm: Option<LlmResults>,
 }
 
 /// The largest gaps between the real cluster and the simulator: admission error in
@@ -70,7 +73,61 @@ pub fn charts(inputs: &Inputs) -> Vec<(String, String)> {
     if let Some(o) = &inputs.overload {
         out.extend(overload_charts(o));
     }
+    if let Some(l) = &inputs.llm {
+        out.extend(llm_chart(l));
+    }
     out
+}
+
+/// File name of the LLM balance chart.
+pub const LLM_CHART: &str = "llm-balance.svg";
+
+const ACCOUNTING_STYLES: [(&str, &str, &str, f64); 3] = [
+    ("estimate_only", "#E69F00", "9 3 2 3", 2.0),
+    ("reserve_max", "#0072B2", "5 3", 2.0),
+    ("admit_then_reconcile", "#009E73", "", 2.5),
+];
+
+/// The busiest tenant's output balance over time under each accounting mode.
+fn llm_chart(l: &LlmResults) -> Option<(String, String)> {
+    let sc = l.scenarios.iter().find(|s| s.name == "azure_2023")?;
+    let mut series = vec![svg::Series {
+        name: "zero (below: in debt)".into(),
+        colour: "#1a1a1a",
+        dash: "1 2",
+        width: 1.0,
+        points: vec![
+            (0.0, 0.0),
+            (
+                sc.balance
+                    .iter()
+                    .flat_map(|b| b.1.last())
+                    .map(|p| p.0)
+                    .fold(0.0, f64::max),
+                0.0,
+            ),
+        ],
+    }];
+    for (name, colour, dash, width) in ACCOUNTING_STYLES {
+        if let Some((_, pts)) = sc.balance.iter().find(|(a, _)| a == name) {
+            series.push(svg::Series {
+                name: name.replace('_', " "),
+                colour,
+                dash,
+                width,
+                points: pts.iter().map(|&(t, b)| (t, b as f64)).collect(),
+            });
+        }
+    }
+    Some((
+        LLM_CHART.to_owned(),
+        svg::lines(
+            &series,
+            "Busiest tenant: output budget left over the first ten minutes (Azure trace, seed 1)",
+            "Seconds",
+            "Output units left",
+        ),
+    ))
 }
 
 /// File name of the overload chart for a scenario.
@@ -235,6 +292,9 @@ pub fn results_md(inputs: &Inputs) -> String {
     if let Some(o) = &inputs.overload {
         md.push_str(&machine_line("Overload", &o.machine));
     }
+    if let Some(l) = &inputs.llm {
+        md.push_str(&machine_line("LLM tokens", &l.machine));
+    }
     if let Some(c) = &inputs.cluster {
         md.push_str(&machine_line("Cluster (inside the containers)", &c.machine));
         if let Some(host) = &c.host {
@@ -249,6 +309,7 @@ pub fn results_md(inputs: &Inputs) -> String {
         ("traces.json", inputs.traces.is_none()),
         ("real_strategies.json", inputs.real_strategies.is_none()),
         ("overload.json", inputs.overload.is_none()),
+        ("llm.json", inputs.llm.is_none()),
     ]
     .iter()
     .filter(|(_, missing)| *missing)
@@ -279,6 +340,9 @@ pub fn results_md(inputs: &Inputs) -> String {
     }
     if let Some(o) = &inputs.overload {
         overload_section(&mut md, o);
+    }
+    if let Some(l) = &inputs.llm {
+        llm_section(&mut md, l);
     }
 
     md.push_str("## Reproduce\n\n```bash\njust results\n```\n\n");
@@ -713,6 +777,121 @@ fn overload_section(md: &mut String, o: &OverloadResults) {
             md,
             "Largest gap in goodput between the real layer and the simulator: **{gap:.1} \
              percentage points**.\n"
+        );
+    }
+}
+
+fn llm_section(md: &mut String, l: &LlmResults) {
+    let azure = l.scenarios.iter().find(|s| s.name == "azure_2023");
+    let _ = write!(
+        md,
+        "## LLM tokens: charging for answers not written yet\n\n\
+         An LLM request costs its prompt tokens, known on arrival, and its answer's tokens, \
+         known only when the answer has finished streaming. Each tenant has an input and an \
+         output budget per {} s. Three ways to charge the output:\n\n\
+         - **estimate_only:** charge a learned estimate (a moving average per model, starting at \
+         {} tokens) and never correct it;\n\
+         - **reserve_max:** reserve the request's maximum answer and refund what was not used;\n\
+         - **admit_then_reconcile:** charge the estimate, then the difference once the answer is \
+         done; a shortfall becomes debt, and the tenant is refused until the refill repays it.\n\n\
+         An **oracle** that knows every answer's length in advance sets the bar. *Wrongly blocked* \
+         is how many fewer requests a mode admitted than the oracle; *overspend* is output served \
+         beyond each tenant's budget for the whole run, as a share of all output served; *worst \
+         window* is the most output one tenant received in one window, as a multiple of its limit \
+         (a token bucket allows up to about 2). Answers stream at {} ms to the first token and {} \
+         ms per token after it, an assumption: the trace records counts, not timings.\n\n",
+        l.window_secs, l.prior_output, l.streaming_ms.0, l.streaming_ms.1
+    );
+    if let Some(a) = azure {
+        let _ = writeln!(
+            md,
+            "**Real requests:** {} requests over {:.0} minutes from the [Azure LLM inference trace]({}) \
+             ({}; CC-BY 4.0), downloaded into memory and checked against pinned SHA-256s. The trace \
+             has no user ids, so requests are spread over {} tenants by a seeded Zipf draw, one draw \
+             per seed.\n",
+            a.requests,
+            a.span_secs / 60.0,
+            l.homepage,
+            l.citation,
+            l.tenants
+        );
+    }
+    for sc in &l.scenarios {
+        let _ = write!(
+            md,
+            "### {}\n\n{}. Limits per tenant per minute, chosen so the oracle blocks at most {}%: \
+             {} input and {} output units. Longest answers allowed: {}. Mean answers: {}. The oracle \
+             blocked {}%.\n\n\
+             | Accounting | Blocked % | Wrongly blocked % | Overspend % | Worst window × limit | Debts | Repaid in, mean ms | Repaid in, p99 ms |\n\
+             |---|---:|---:|---:|---:|---:|---:|---:|\n",
+            sc.name,
+            capitalise(&sc.description),
+            l.target_blocked_pct,
+            sc.input_limit,
+            sc.output_limit,
+            sc.max_output
+                .iter()
+                .map(|(m, x)| format!("{m} {x}"))
+                .collect::<Vec<_>>()
+                .join(", "),
+            sc.mean_output
+                .iter()
+                .map(|(m, x)| format!("{m} {x:.0}"))
+                .collect::<Vec<_>>()
+                .join(", "),
+            spread(&sc.oracle_blocked_pct, 2)
+        );
+        for r in &sc.rows {
+            let _ = writeln!(
+                md,
+                "| {} | {} | {} | {} | {} | {} | {} | {} |",
+                r.accounting,
+                spread(&r.blocked_pct, 2),
+                spread(&r.wrongly_blocked_pct, 2),
+                spread(&r.overspend_pct, 3),
+                spread(&r.worst_window, 2),
+                spread(&r.debts, 0),
+                spread(&r.recovery_mean_ms, 0),
+                spread(&r.recovery_p99_ms, 0)
+            );
+        }
+        md.push('\n');
+    }
+    if azure.is_some() {
+        let _ = writeln!(
+            md,
+            "![The busiest tenant's output budget over time under each mode]({LLM_CHART})\n"
+        );
+    }
+    if let Some(r) = &l.real {
+        let _ = write!(
+            md,
+            "### The real layer, checked\n\n\
+             The first {} minute(s) of the trace ({} requests, seed 1) through the server's \
+             `TokenLimitLayer` and mock model, streaming real server-sent events in real time at \
+             {}× speed, against the simulator on the same requests.\n\n\
+             | Accounting | Blocked % real | sim | Overspend % real | sim | Worst window real | sim | Debts real | sim |\n\
+             |---|---:|---:|---:|---:|---:|---:|---:|---:|\n",
+            r.trace_minutes, r.requests, r.speedup
+        );
+        for x in &r.rows {
+            let _ = writeln!(
+                md,
+                "| {} | {:.2} | {:.2} | {:.3} | {:.3} | {:.2} | {:.2} | {} | {} |",
+                x.accounting,
+                x.blocked_pct.0,
+                x.blocked_pct.1,
+                x.overspend_pct.0,
+                x.overspend_pct.1,
+                x.worst_window.0,
+                x.worst_window.1,
+                x.debts.0,
+                x.debts.1
+            );
+        }
+        md.push_str(
+            "\nDebts on the real layer are found by sampling every tenant's balance every 5 ms, so \
+             a debt repaid within one sample can be missed.\n\n",
         );
     }
 }
@@ -1162,6 +1341,31 @@ pub fn readme_block(inputs: &Inputs) -> String {
             );
         }
     }
+    if let Some(l) = &inputs.llm
+        && let Some(a) = l.scenarios.iter().find(|s| s.name == "azure_2023")
+    {
+        let get = |name: &str| a.rows.iter().find(|r| r.accounting == name);
+        if let (Some(est), Some(res), Some(rec)) = (
+            get("estimate_only"),
+            get("reserve_max"),
+            get("admit_then_reconcile"),
+        ) {
+            let _ = writeln!(
+                md,
+                "**LLM tokens** ({} real requests from the Azure LLM trace): reserving each request's \
+                 maximum answer turned away {:.1}% of all requests that an oracle knowing every \
+                 answer's length would have served; admit-then-reconcile turned away {:.1}%, with \
+                 {:.2}% overspend and debts repaid in {:.0} ms on average. Charging an estimate and \
+                 never correcting it overspent {:.2}%.\n",
+                a.requests,
+                res.wrongly_blocked_pct.mean,
+                rec.wrongly_blocked_pct.mean,
+                rec.overspend_pct.mean,
+                rec.recovery_mean_ms.mean,
+                est.overspend_pct.mean
+            );
+        }
+    }
     if let Some(c) = &inputs.cluster
         && let Some(uniform) = c.scenarios.iter().find(|r| r.scenario == "uniform")
     {
@@ -1222,7 +1426,7 @@ mod tests {
     #[test]
     fn empty_inputs_say_nothing_was_measured() {
         let md = results_md(&Inputs::default());
-        assert!(md.contains("Not measured yet: local.json, memory.json, cluster.json, strategies.json, traces.json, real_strategies.json, overload.json"));
+        assert!(md.contains("Not measured yet: local.json, memory.json, cluster.json, strategies.json, traces.json, real_strategies.json, overload.json, llm.json"));
         assert!(readme_block(&Inputs::default()).contains("No results yet"));
     }
 }

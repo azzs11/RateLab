@@ -8,6 +8,8 @@
 //! - [`cluster`]: the 3-node Docker run against Redis (the `loadgen` binary);
 //! - [`strategies`]: the five coordination strategies in the multi-node simulator;
 //! - [`real_strategies`]: the strategies on the real Docker cluster, against the simulator;
+//! - [`llm`]: token limits for LLM traffic (estimate-only, reserve-max,
+//!   admit-then-reconcile) on a real Azure trace and synthetic requests;
 //! - [`overload`]: no limit, static, AIMD and Gradient2 concurrency limits in front of a
 //!   backend with limited capacity, simulated and on the real Tower layer;
 //! - [`real_traffic`]: every algorithm and strategy on a public request log ([`traces`]);
@@ -17,6 +19,7 @@
 #![forbid(unsafe_code)]
 
 pub mod cluster;
+pub mod llm;
 pub mod local;
 pub mod machine;
 pub mod memory;

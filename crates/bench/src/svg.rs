@@ -206,15 +206,22 @@ pub struct Series {
     pub points: Vec<(f64, f64)>,
 }
 
-/// A line chart from zero on both axes. Each line has a tooltip and a legend entry.
+/// A line chart from zero on the x axis. The y axis starts at zero, or below it when a
+/// line goes negative. Each line has a tooltip and a legend entry.
 pub fn lines(series: &[Series], title: &str, x_label: &str, y_label: &str) -> String {
     let plot_w = W - LEFT - RIGHT;
     let plot_h = H - TOP - BOTTOM;
     let all = || series.iter().flat_map(|s| s.points.iter());
     let x_max = all().map(|p| p.0).fold(0.0, f64::max).max(1e-9);
-    let y_max = nice(all().map(|p| p.1).fold(0.0, f64::max));
+    let raw_max = all().map(|p| p.1).fold(0.0, f64::max);
+    let raw_min = all().map(|p| p.1).fold(0.0, f64::min);
+    // Four equal steps covering both signs.
+    let step = nice((raw_max - raw_min) / 4.0);
+    let y_min = (raw_min / step).floor() * step;
+    let steps = ((raw_max - y_min) / step).ceil().max(1.0) as u32;
+    let y_max = y_min + step * f64::from(steps);
     let px = |x: f64| LEFT + x / x_max * plot_w;
-    let py = |y: f64| TOP + plot_h - y / y_max * plot_h;
+    let py = |y: f64| TOP + plot_h - (y - y_min) / (y_max - y_min) * plot_h;
     let mut svg = String::new();
     let _ = write!(
         svg,
@@ -224,8 +231,8 @@ pub fn lines(series: &[Series], title: &str, x_label: &str, y_label: &str) -> St
 "##,
         t = escape(title)
     );
-    for i in 0..=4 {
-        let v = y_max * f64::from(i) / 4.0;
+    for i in 0..=steps {
+        let v = y_min + step * f64::from(i);
         let y = py(v);
         let _ = writeln!(
             svg,
@@ -235,7 +242,7 @@ pub fn lines(series: &[Series], title: &str, x_label: &str, y_label: &str) -> St
             y + 4.0
         );
     }
-    let x_step = if x_max > 20.0 { 5.0 } else { 2.0 };
+    let x_step = nice(x_max / 6.0).max(1.0);
     let mut x = 0.0;
     while x <= x_max + 1e-9 {
         let _ = writeln!(
