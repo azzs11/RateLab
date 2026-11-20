@@ -76,6 +76,8 @@ struct Leasing {
     sizing: Sizing,
     policy: FailurePolicy,
     failure_backoff: Duration,
+    /// Longest wait after the store had nothing to lease.
+    max_backoff: Duration,
     keys: BTreeMap<String, KeyLease>,
     next: MessageId,
     pending: HashMap<MessageId, String>,
@@ -92,6 +94,7 @@ impl Leasing {
             sizing,
             policy,
             failure_backoff: config.window(),
+            max_backoff: config.window() / 10,
             keys: BTreeMap::new(),
             next: 0,
             pending: HashMap::new(),
@@ -222,6 +225,7 @@ impl Leasing {
             return; // a Return's acknowledgement
         };
         let sizing = self.sizing;
+        let max_backoff = self.max_backoff;
         let Some(lease) = self.keys.get_mut(&key) else {
             return;
         };
@@ -241,7 +245,9 @@ impl Leasing {
             return;
         }
         if granted == 0 {
-            let retry = retry_after.unwrap_or(Duration::ZERO);
+            // The store says when the whole lease will be there; do not wait longer than
+            // a tenth of the window, or a node with a large lease stalls in bursts.
+            let retry = retry_after.unwrap_or(Duration::ZERO).min(max_backoff);
             lease.backoff_until = now.saturating_add(retry);
             lease.backoff_failure = false;
             lease.retry_hint = retry;
@@ -478,8 +484,9 @@ mod tests {
         }
         let denied = out.decisions[2].1;
         assert!(!denied.allowed);
-        // Waits until a whole lease of 2 is back: 2 tokens at 2 per second.
-        assert_eq!(denied.retry_after, Some(Duration::from_secs(1)));
+        // The store says a whole lease of 2 is back in 1 s; the node waits at most a
+        // tenth of the window.
+        assert_eq!(denied.retry_after, Some(Duration::from_millis(100)));
         out.clear();
         // Within the backoff: denied locally, no store traffic.
         node.on_request(Nanos(100), 3, "k", Cost::ONE, &mut out);
