@@ -8,8 +8,8 @@
     "arch": "aarch64",
     "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
     "profile": "release",
-    "git_commit": "4076abe200b4",
-    "measured_at": "2026-11-20T10:54:53Z"
+    "git_commit": "5301e8f73c0d",
+    "measured_at": "2026-11-20T13:04:02Z"
   },
   "size": {
     "name": "full",

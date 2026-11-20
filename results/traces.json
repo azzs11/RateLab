@@ -1,0 +1,165 @@
+{
+  "schema": 1,
+  "machine": {
+    "cpu": "Apple M5",
+    "logical_cpus": 10,
+    "memory_bytes": 17179869184,
+    "os": "macOS 27.0",
+    "arch": "aarch64",
+    "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+    "profile": "release",
+    "git_commit": "5301e8f73c0d",
+    "measured_at": "2026-11-20T13:05:19Z"
+  },
+  "trace": {
+    "name": "NASA-HTTP (KSC, Jul–Aug 1995)",
+    "homepage": "https://ita.ee.lbl.gov/html/contrib/NASA-HTTP.html",
+    "files": [
+      [
+        "https://ita.ee.lbl.gov/traces/NASA_access_log_Jul95.gz",
+        "199109ed0f273e095da6ccd5fc9dc4cd8bb58daa06d62135e62090fea9d27488"
+      ],
+      [
+        "https://ita.ee.lbl.gov/traces/NASA_access_log_Aug95.gz",
+        "14995aed0ba4558ab832613ebea9a3ef2d87cb4297fc67f5694e0032bbb6b788"
+      ]
+    ],
+    "requests": 3461612,
+    "clients": 137978,
+    "skipped": 1,
+    "span_secs": 5356792,
+    "resolution_secs": 1
+  },
+  "window_secs": 60,
+  "limit": 13,
+  "target_blocked_pct": 1.0,
+  "algorithms": [
+    {
+      "algorithm": "token_bucket",
+      "blocked_pct": 0.10420000855092945,
+      "over_pct": 0.7406087106238365,
+      "under_pct": 0.013808595532948234,
+      "worst_window_ratio": 1.9230769230769231
+    },
+    {
+      "algorithm": "leaky_bucket",
+      "blocked_pct": 0.10420000855092945,
+      "over_pct": 0.7406087106238365,
+      "under_pct": 0.013808595532948234,
+      "worst_window_ratio": 1.9230769230769231
+    },
+    {
+      "algorithm": "fixed_window",
+      "blocked_pct": 0.36433892648858396,
+      "over_pct": 0.5217800261843326,
+      "under_pct": 0.055118829031098805,
+      "worst_window_ratio": 2.0
+    },
+    {
+      "algorithm": "sliding_window",
+      "blocked_pct": 0.8310001236418177,
+      "over_pct": 0.0,
+      "under_pct": 0.0,
+      "worst_window_ratio": 1.0
+    },
+    {
+      "algorithm": "gcra",
+      "blocked_pct": 0.10420000855092945,
+      "over_pct": 0.7406087106238365,
+      "under_pct": 0.013808595532948234,
+      "worst_window_ratio": 1.9230769230769231
+    }
+  ],
+  "strategies": [
+    {
+      "strategy": "central_exact",
+      "nodes": 3,
+      "error_pct": 0.00005783681631460914,
+      "over_pct": 0.0,
+      "under_pct": 0.00005783681631460914,
+      "calls_per_1k": 1000.0,
+      "p99_us": 964.784
+    },
+    {
+      "strategy": "local_split",
+      "nodes": 3,
+      "error_pct": 0.6960082475300065,
+      "over_pct": 0.0024869831015281933,
+      "under_pct": 0.6935212644284783,
+      "calls_per_1k": 0.0,
+      "p99_us": 0.0
+    },
+    {
+      "strategy": "async_sync",
+      "nodes": 3,
+      "error_pct": 0.02637358823946177,
+      "over_pct": 0.01885480211856258,
+      "under_pct": 0.007518786120899189,
+      "calls_per_1k": 942.4941327913123,
+      "p99_us": 0.0
+    },
+    {
+      "strategy": "fixed_leasing",
+      "nodes": 3,
+      "error_pct": 0.00011567363262921829,
+      "over_pct": 0.0,
+      "under_pct": 0.00011567363262921829,
+      "calls_per_1k": 993.5931583320141,
+      "p99_us": 1637.312
+    },
+    {
+      "strategy": "adaptive_leasing",
+      "nodes": 3,
+      "error_pct": 0.06497966312946338,
+      "over_pct": 0.0026604935504720207,
+      "under_pct": 0.062319169578991356,
+      "calls_per_1k": 1054.5867070024024,
+      "p99_us": 1573.577
+    },
+    {
+      "strategy": "central_exact",
+      "nodes": 8,
+      "error_pct": 0.00005783681631460914,
+      "over_pct": 0.0,
+      "under_pct": 0.00005783681631460914,
+      "calls_per_1k": 1000.0,
+      "p99_us": 964.784
+    },
+    {
+      "strategy": "local_split",
+      "nodes": 8,
+      "error_pct": 14.832453972738616,
+      "over_pct": 0.001214573142606792,
+      "under_pct": 14.83123939959601,
+      "calls_per_1k": 0.0,
+      "p99_us": 0.0
+    },
+    {
+      "strategy": "async_sync",
+      "nodes": 8,
+      "error_pct": 0.6123472927309244,
+      "over_pct": 0.03490451864586662,
+      "under_pct": 0.5774427740850577,
+      "calls_per_1k": 976.5291430697606,
+      "p99_us": 0.0
+    },
+    {
+      "strategy": "fixed_leasing",
+      "nodes": 8,
+      "error_pct": 0.00014459204078652287,
+      "over_pct": 0.00002891840815730457,
+      "under_pct": 0.00011567363262921829,
+      "calls_per_1k": 998.9034010744127,
+      "p99_us": 1522.301
+    },
+    {
+      "strategy": "adaptive_leasing",
+      "nodes": 8,
+      "error_pct": 0.06859446414912644,
+      "over_pct": 0.0030075144483596755,
+      "under_pct": 0.06558694970076677,
+      "calls_per_1k": 1068.5226998288658,
+      "p99_us": 1487.977
+    }
+  ]
+}
