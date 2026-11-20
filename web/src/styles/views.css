@@ -342,3 +342,64 @@ tbody th {
 .pareto {
   max-height: 70vh;
 }
+
+/* ---------- Lab ---------- */
+
+.lab-stage {
+  display: grid;
+  gap: var(--s-6);
+}
+
+.lab-stage.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 960px) {
+  .lab-stage.two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.lab-panel {
+  display: grid;
+  gap: var(--s-3);
+  min-width: 0;
+}
+
+.lab-title {
+  font-size: var(--step-2);
+}
+
+.lab-visuals {
+  display: grid;
+  gap: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  padding: var(--s-3);
+}
+
+.lab-panel .stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.lab-panel .stat:nth-child(2n) {
+  border-right: 0;
+}
+
+.lab-panel .stat:nth-child(-n + 2) {
+  border-bottom: 1px solid var(--line);
+}
+
+.lab-how {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--s-5);
+  padding-block: var(--s-6) var(--s-8);
+}
+
+.lab-how h3 {
+  margin-bottom: var(--s-2);
+}

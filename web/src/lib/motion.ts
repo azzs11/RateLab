@@ -13,6 +13,7 @@ export interface Player {
   toggle(): void;
   seek(ms: number): void;
   setDuration(ms: number): void;
+  setSpeed(simMsPerRealMs: number): void;
   dispose(): void;
 }
 
@@ -30,7 +31,7 @@ export function player(
   let raf = 0;
   let last = 0;
   let stepTimer = 0;
-  const speed = opts.speed ?? 1;
+  let speed = opts.speed ?? 1;
 
   const advance = (dt: number) => {
     t += dt * speed;
@@ -91,6 +92,9 @@ export function player(
     setDuration(ms: number) {
       duration = Math.max(1, ms);
       if (t > duration) t = duration;
+    },
+    setSpeed(s: number) {
+      speed = s;
     },
     dispose: stop,
   };
