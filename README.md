@@ -78,7 +78,8 @@ to the same Redis enforces one shared limit.
 How N nodes enforce **one** limit together. Each strategy is a state machine with no
 I/O: it receives requests, store replies and timer ticks, and returns decisions and
 messages for a shared store (the logic Redis runs). The same code runs in the
-simulator and in tests.
+simulator, in tests, and on the real cluster: `web-server --backend strategy
+--strategy adaptive_leasing` runs a node against Redis through `scripts/store_op.lua`.
 
 | Strategy | Talks to the store | Trade-off |
 |----------|--------------------|-----------|
@@ -317,10 +318,21 @@ and the table above:
 3. `cargo run -p bench --release -- strategies`: the five coordination strategies on
    1, 3 and 8 simulated nodes, plus clock skew, store outage and traffic shift
    (`results/strategies.json`);
-4. `just cluster`: 3 nodes + Redis + load generator in Docker Compose
+4. `just traces`: **real traffic**: a public request log (NASA KSC, 1995) downloaded
+   into memory, checked against a pinned SHA-256 and replayed through every algorithm
+   and strategy (`results/traces.json`); nothing is saved;
+5. `just cluster`: 3 nodes + Redis + load generator in Docker Compose
    (`results/cluster.json`);
-5. `cargo run -p bench --release -- report`: the Markdown and the Pareto charts, from
+6. `just cluster-strategies`: **every strategy on the real cluster** with Redis as the
+   shared store, and the simulator fed the same recorded requests
+   (`results/real_strategies.json`);
+7. `cargo run -p bench --release -- report`: the Markdown and the Pareto charts, from
    the JSON files only.
+
+Everything a run needs is removed as soon as it finishes: the downloaded log only ever
+lives in memory, and each Docker run removes its containers, networks, volumes and
+images. `just clean` frees the rebuildable caches (Rust build output and Docker's build
+cache).
 
 **Method.**
 
@@ -341,9 +353,11 @@ and the table above:
 - **Cluster run:** the nodes, Redis and the load generator share one machine and
   Docker's network, so the cluster numbers show the protocol's behaviour, not a
   production deployment.
-- **Strategy simulation:** the network is a model (fixed delay plus jitter), so those
-  numbers compare protocols; they are not measurements of a real network. The
-  strategies do not yet run against a real Redis.
+- **Strategy simulation:** the network is a model (fixed delay plus jitter). It is
+  checked against the real cluster (`just cluster-strategies`): both sides get the same
+  recorded requests, and RESULTS.md reports the largest gap.
+- **Real traffic:** the public log is from 1995 and has one-second timestamps; it shows
+  how real clients behave (many sparse, a few heavy), not today's API volumes.
 - **Latency on macOS:** the clock ticks too coarsely to time one call, so latency is
   timed in batches of calls (see RESULTS.md).
 
@@ -374,8 +388,6 @@ test pauses Redis with `CLIENT PAUSE` instead of waiting.
 
 These features are **not built yet**:
 
-- **Strategies on real Redis:** Lua scripts for lease, return and sync, and the
-  strategies running on the 3-node Docker cluster
 - **Multi-tier limits:** per user, IP, endpoint and global limits combined
 - **LLM token limits in the playground:** with the token-aware limiter (Phase 5)
 

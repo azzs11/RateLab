@@ -95,12 +95,31 @@ function block(id: string, title: string, intro: string, machine: Machine | null
 
 const missing = (what: string) => h("p", { class: "note" }, `${what} has not been measured for this build.`);
 
+interface Traces {
+  machine: Machine;
+  trace: { name: string; homepage: string; requests: number; clients: number; span_secs: number };
+  window_secs: number;
+  limit: number;
+  target_blocked_pct: number;
+  algorithms: { algorithm: string; blocked_pct: number; over_pct: number; worst_window_ratio: number }[];
+  strategies: { strategy: string; nodes: number; error_pct: number; calls_per_1k: number }[];
+}
+
+interface RealStrategies {
+  machine: Machine;
+  nodes: number;
+  seeds: number;
+  rows: { strategy: string; scenario: string; real_error_pct: Summary; sim_error_pct: Summary; real_calls_per_1k: Summary; sim_calls_per_1k: Summary }[];
+}
+
 export default async function results(root: HTMLElement) {
-  const [local, memory, cluster, strategies] = await Promise.all([
+  const [local, memory, cluster, strategies, traces, real] = await Promise.all([
     loadResults<Local>("local"),
     loadResults<Memory>("memory"),
     loadResults<Cluster>("cluster"),
     loadResults<StrategyResults>("strategies"),
+    loadResults<Traces>("traces"),
+    loadResults<RealStrategies>("real_strategies"),
   ]);
 
   root.append(
@@ -313,6 +332,51 @@ export default async function results(root: HTMLElement) {
       ),
     );
   }
+  if (traces) {
+    root.append(
+      block(
+        "traces",
+        "Real traffic",
+        `${fmtInt(traces.trace.requests)} requests from ${fmtInt(traces.trace.clients)} clients over ${Math.round(traces.trace.span_secs / 86400)} days: ${traces.trace.name}. Downloaded into memory when the benchmark runs and discarded after; nothing is stored. The limit, ${traces.limit} per ${traces.window_secs} s per client, is the smallest at which the exact rule blocks at most ${traces.target_blocked_pct}% of requests.`,
+        traces.machine,
+        h("p", {}, h("a", { href: traces.trace.homepage }, "About the dataset and its terms")),
+        table(
+          "Every algorithm on the real log",
+          ["Algorithm", "Blocked", "Over vs exact", "Worst window ÷ limit"],
+          traces.algorithms.map((r) => [pretty(r.algorithm), fmtPct(r.blocked_pct), fmtPct(r.over_pct, 3), `${r.worst_window_ratio.toFixed(2)}×`]),
+        ),
+        table(
+          "Every strategy on the real log (simulated cluster)",
+          ["Strategy", "Nodes", "Admission error", "Store calls / 1k"],
+          traces.strategies.map((r) => [pretty(r.strategy), String(r.nodes), fmtPct(r.error_pct), fmtInt(r.calls_per_1k)]),
+        ),
+      ),
+    );
+  }
+
+  if (real) {
+    root.append(
+      block(
+        "real",
+        "The simulator, checked",
+        `Every strategy on ${real.nodes} real nodes and a real Redis, and the simulator fed the same recorded requests. ${real.seeds} seeds each.`,
+        real.machine,
+        table(
+          "Real cluster against the simulator",
+          ["Strategy", "Traffic", "Error real", "Error sim", "Calls / 1k real", "Calls / 1k sim"],
+          real.rows.map((r) => [
+            pretty(r.strategy),
+            h("td", {}, r.scenario),
+            fmtPct(r.real_error_pct.mean),
+            fmtPct(r.sim_error_pct.mean),
+            fmtInt(r.real_calls_per_1k.mean),
+            fmtInt(r.sim_calls_per_1k.mean),
+          ]),
+        ),
+      ),
+    );
+  }
+
   root.append(h("div", { class: "spacer" }));
   return () => {};
 }

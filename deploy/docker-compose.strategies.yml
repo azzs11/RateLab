@@ -1,0 +1,23 @@
+# Override for `just cluster-strategies`: the three nodes run a coordination strategy
+# against Redis, and the load generator switches them through the benchmark-only admin
+# route, measuring every strategy and replaying the same requests in the simulator.
+#
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.strategies.yml up ...
+
+x-strategy: &strategy
+  DRL_BACKEND: strategy
+  DRL_STRATEGY: central_exact
+  DRL_NODES: "3"
+  DRL_ADMIN: "true"
+
+services:
+  node1:
+    environment: *strategy
+  node2:
+    environment: *strategy
+  node3:
+    environment: *strategy
+  loadgen:
+    environment:
+      DRL_MODE: strategies
+      DRL_OUT: /results/real_strategies.json

@@ -8,7 +8,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const from = join(here, "..", "..", "results");
 const to = join(here, "..", "public", "data");
 mkdirSync(to, { recursive: true });
-for (const name of ["local.json", "memory.json", "cluster.json", "strategies.json"]) {
+for (const name of ["local.json", "memory.json", "cluster.json", "strategies.json", "traces.json", "real_strategies.json"]) {
   const src = join(from, name);
   if (existsSync(src)) {
     copyFileSync(src, join(to, name));

@@ -133,9 +133,18 @@ jobs:
         test -s results/cluster.json
         grep -q '"nodes": 3' results/cluster.json
 
+    - name: Every strategy on the real cluster against the simulator (quick)
+      env:
+        DRL_QUICK: "true"
+        DRL_GIT_COMMIT: ${{ github.sha }}
+      run: |
+        docker compose -f deploy/docker-compose.yml down --remove-orphans
+        docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.strategies.yml up --build --abort-on-container-exit --exit-code-from loadgen
+        test -s results/real_strategies.json
+
     - name: Stop the cluster
       if: always()
-      run: docker compose -f deploy/docker-compose.yml down --remove-orphans
+      run: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.strategies.yml down --rmi all --volumes --remove-orphans
 
   web:
     name: Playground (typecheck, unit, end-to-end, accessibility)

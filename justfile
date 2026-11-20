@@ -20,7 +20,13 @@ test-docker:
     cargo test --workspace -- --ignored
 
 # Reproduce every number in results/RESULTS.md and the README (needs Docker).
-results: bench cluster report
+# Downloads and containers are removed as each step finishes; only results/ is kept.
+results: bench traces cluster cluster-strategies report
+
+# A public request log (downloaded into memory, never saved) through every algorithm
+# and strategy: results/traces.json.
+traces quick="false":
+    cargo run -p bench --release -- traces {{ if quick == "true" { "--quick" } else { "" } }}
 
 # In-process suite, memory per key and the strategy simulation:
 # results/local.json, results/memory.json, results/strategies.json.
@@ -37,8 +43,27 @@ cluster quick="false":
     export DRL_QUICK={{quick}}
     export DRL_HOST="$(cargo run -q -p bench --release -- machine)"
     export DRL_GIT_COMMIT="$(cargo run -q -p bench --release -- machine | sed -n 's/.*commit `\(.*\)`.*/\1/p')"
-    trap '{{compose}} down --remove-orphans >/dev/null 2>&1' EXIT
+    # Remove containers, networks, volumes and every image this run built or pulled.
+    trap '{{compose}} down --rmi all --volumes --remove-orphans >/dev/null 2>&1; docker image prune -f >/dev/null 2>&1' EXIT
     {{compose}} up --build --abort-on-container-exit --exit-code-from loadgen
+
+# Every coordination strategy on the real 3-node cluster, against the simulator:
+# results/real_strategies.json.
+cluster-strategies quick="false":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p results
+    export DRL_QUICK={{quick}}
+    export DRL_HOST="$(cargo run -q -p bench --release -- machine)"
+    export DRL_GIT_COMMIT="$(cargo run -q -p bench --release -- machine | sed -n 's/.*commit `\(.*\)`.*/\1/p')"
+    files="-f deploy/docker-compose.yml -f deploy/docker-compose.strategies.yml"
+    trap "docker compose $files down --rmi all --volumes --remove-orphans >/dev/null 2>&1; docker image prune -f >/dev/null 2>&1" EXIT
+    docker compose $files up --build --abort-on-container-exit --exit-code-from loadgen
+
+# Free the rebuildable caches: Rust build output and Docker's build cache (all of it).
+clean:
+    cargo clean
+    docker builder prune -f
 
 # Regenerate results/RESULTS.md and the README table from the JSON files.
 report:
