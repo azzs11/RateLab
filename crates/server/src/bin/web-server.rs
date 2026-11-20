@@ -4,6 +4,7 @@
 //! cargo run -p server --bin web-server                         # in-process limiter
 //! cargo run -p server --bin web-server -- --backend redis      # shared through Redis
 //! cargo run -p server --bin web-server -- --concurrency gradient2  # shed overload with 503
+//! cargo run -p server --bin web-server -- --llm                  # mock LLM with token limits
 //! ```
 //!
 //! Every flag can also be set by environment variable (`DRL_BACKEND`, `DRL_LIMIT`, ...).
@@ -81,6 +82,24 @@ struct Args {
     /// Requests above it get `503` at once instead of queueing.
     #[arg(long, env = "DRL_CONCURRENCY", default_value = "off")]
     concurrency: String,
+    /// Serve a mock LLM at POST /v1/completions behind a token limit (models `small`
+    /// and `large`; `large` costs 3× per input token and 6× per output token).
+    #[arg(long, env = "DRL_LLM", default_value_t = false)]
+    llm: bool,
+    /// How the token limit charges output: estimate_only, reserve_max or
+    /// admit_then_reconcile.
+    #[arg(
+        long,
+        env = "DRL_TOKEN_ACCOUNTING",
+        default_value = "admit_then_reconcile"
+    )]
+    token_accounting: String,
+    /// Input units per minute per caller.
+    #[arg(long, env = "DRL_TOKEN_INPUT_PER_MIN", default_value_t = 100_000)]
+    token_input_per_min: u64,
+    /// Output units per minute per caller.
+    #[arg(long, env = "DRL_TOKEN_OUTPUT_PER_MIN", default_value_t = 20_000)]
+    token_output_per_min: u64,
     /// Directory with the built playground (`cd web && npm run build`). Static files are
     /// served from here when it exists.
     #[arg(long, env = "DRL_WEB_DIR", default_value = "web/dist")]
@@ -156,6 +175,30 @@ async fn main() -> anyhow::Result<()> {
         &args.web_dir,
         concurrency.map(|c| Arc::new(ConcurrencyLimiter::new(c))),
     );
+    if args.llm {
+        use drl_core::tokens::{Accounting, ModelPolicy, TokenLimiter, TokenPolicy};
+        use server::llm::{MockModel, TokenLimitLayer, mock_router};
+        let accounting: Accounting = args.token_accounting.parse()?;
+        let policy = TokenPolicy::new(
+            RateLimitConfig::per_minute(args.token_input_per_min)
+                .context("invalid --token-input-per-min")?,
+            RateLimitConfig::per_minute(args.token_output_per_min)
+                .context("invalid --token-output-per-min")?,
+            accounting,
+        )
+        .model("small", ModelPolicy::new(1, 1, 1_024, 256))
+        .model("large", ModelPolicy::new(3, 6, 4_096, 512));
+        let limiter = Arc::new(TokenLimiter::new(policy, MonotonicClock::new()));
+        let mock = MockModel {
+            first_token: Duration::from_millis(200),
+            per_token: Duration::from_millis(20),
+        };
+        tracing::info!(
+            accounting = accounting.name(),
+            "mock LLM at POST /v1/completions"
+        );
+        router = router.merge(mock_router(mock).layer(TokenLimitLayer::new(limiter)));
+    }
     if args.admin {
         tracing::warn!("benchmark-only /admin routes are enabled");
         router = router.merge(app::admin_router(limits));

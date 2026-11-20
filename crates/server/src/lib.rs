@@ -10,5 +10,6 @@ pub mod capacity;
 pub mod concurrency;
 pub mod headers;
 pub mod layer;
+pub mod llm;
 pub mod metrics;
 pub mod strategy;

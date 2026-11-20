@@ -2568,6 +2568,7 @@ dependencies = [
  "clap",
  "drl-core",
  "drl-redis-store",
+ "futures-util",
  "metrics",
  "metrics-exporter-prometheus",
  "redis",
