@@ -5,8 +5,9 @@
 //! seed always gives the same arrivals and the same decisions, on every platform:
 //! everything here is integer arithmetic.
 //!
-//! This is the single-node core of the simulator. Multiple nodes, network delay and
-//! outages arrive in Phase 3 of the roadmap.
+//! [`run`] replays traffic through one limiter; [`cluster::run_cluster`] simulates N
+//! nodes coordinating through a shared store, with network delay, clock skew and
+//! outages.
 //!
 //! ```
 //! use drl_core::{Algorithm, ManualClock, RateLimitConfig};
@@ -36,6 +37,7 @@
 use drl_core::{Clock, Cost, Decision, ManualClock, Nanos, RateLimitConfig, RateLimiter};
 use std::time::Duration;
 
+pub mod cluster;
 mod scenarios;
 pub use scenarios::{diurnal, flash_crowd, merge, on_off, pareto, poisson};
 
