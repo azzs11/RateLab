@@ -1,37 +1,48 @@
-use lazy_static::lazy_static;
 use prometheus::{Encoder, Histogram, IntCounter, Registry, TextEncoder};
+use std::sync::LazyLock;
 use std::time::Instant;
 
-lazy_static! {
-    /// Global metrics registry
-    pub static ref REGISTRY: Registry = Registry::new();
+/// Global metrics registry
+pub static REGISTRY: LazyLock<Registry> = LazyLock::new(Registry::new);
 
-    /// Total requests processed
-    pub static ref REQUESTS_TOTAL: IntCounter = IntCounter::new(
+/// Total requests processed
+pub static REQUESTS_TOTAL: LazyLock<IntCounter> = LazyLock::new(|| {
+    IntCounter::new(
         "rate_limiter_requests_total",
-        "Total number of requests processed"
-    ).expect("metric can be created");
+        "Total number of requests processed",
+    )
+    .expect("metric can be created")
+});
 
-    /// Requests allowed
-    pub static ref REQUESTS_ALLOWED: IntCounter = IntCounter::new(
+/// Requests allowed
+pub static REQUESTS_ALLOWED: LazyLock<IntCounter> = LazyLock::new(|| {
+    IntCounter::new(
         "rate_limiter_requests_allowed",
-        "Number of requests allowed"
-    ).expect("metric can be created");
+        "Number of requests allowed",
+    )
+    .expect("metric can be created")
+});
 
-    /// Requests blocked
-    pub static ref REQUESTS_BLOCKED: IntCounter = IntCounter::new(
+/// Requests blocked
+pub static REQUESTS_BLOCKED: LazyLock<IntCounter> = LazyLock::new(|| {
+    IntCounter::new(
         "rate_limiter_requests_blocked",
-        "Number of requests blocked"
-    ).expect("metric can be created");
+        "Number of requests blocked",
+    )
+    .expect("metric can be created")
+});
 
-    /// Request processing latency
-    pub static ref REQUEST_LATENCY: Histogram = Histogram::with_opts(
+/// Request processing latency
+pub static REQUEST_LATENCY: LazyLock<Histogram> = LazyLock::new(|| {
+    Histogram::with_opts(
         prometheus::HistogramOpts::new(
             "rate_limiter_request_duration_seconds",
-            "Request processing latency in seconds"
-        ).buckets(vec![0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1])
-    ).expect("metric can be created");
-}
+            "Request processing latency in seconds",
+        )
+        .buckets(vec![0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1]),
+    )
+    .expect("metric can be created")
+});
 
 /// Initialize metrics registry
 pub fn init_metrics() {
