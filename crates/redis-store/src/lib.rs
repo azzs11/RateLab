@@ -2,8 +2,8 @@
 //!
 //! - **One multiplexed connection** per limiter ([`redis::aio::ConnectionManager`]),
 //!   reconnecting automatically. It is cheap to share between tasks.
-//! - **EVALSHA:** the Lua script (`scripts/token_bucket.lua`) is sent by hash; Redis
-//!   only receives the full script again after a `NOSCRIPT` reply.
+//! - **EVALSHA:** the Lua script (`scripts/token_bucket.lua`) is sent by hash; the full
+//!   script is only sent again (`SCRIPT LOAD`) after a `NOSCRIPT` reply.
 //! - **Redis `TIME`:** the script reads Redis's clock, so application servers with
 //!   skewed clocks still agree on the bucket.
 //! - **Exact integers:** token amounts are scaled by the window in microseconds, the
@@ -162,8 +162,9 @@ impl RedisRateLimiter {
         self.config
     }
 
-    /// Script calls made so far (each is one EVALSHA round trip, plus one EVAL after a
-    /// `NOSCRIPT` reply).
+    /// Checks sent to Redis so far. Each is one EVALSHA round trip; after a `NOSCRIPT`
+    /// reply the client also sends `SCRIPT LOAD` and retries, which is not counted here
+    /// (Redis's own `INFO commandstats` counts every command).
     pub fn redis_calls(&self) -> u64 {
         self.calls.load(Ordering::Relaxed)
     }

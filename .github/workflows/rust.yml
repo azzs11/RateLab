@@ -75,18 +75,8 @@ jobs:
       run: cargo build --locked -p wasm --target wasm32-unknown-unknown --release
 
   redis:
-    name: Redis integration
+    name: Redis integration (testcontainers)
     runs-on: ubuntu-latest
-    services:
-      redis:
-        image: redis:7.4-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 2s
-          --health-timeout 2s
-          --health-retries 10
     steps:
     - uses: actions/checkout@v7
 
@@ -95,5 +85,6 @@ jobs:
 
     - uses: Swatinem/rust-cache@v2
 
-    - name: Run tests that need a live Redis
+    # The tests start their own Redis container through the runner's Docker.
+    - name: Run tests that need Docker
       run: cargo test --locked -p drl-redis-store -- --ignored
