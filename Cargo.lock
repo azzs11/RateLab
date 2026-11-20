@@ -2137,6 +2137,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ratelab-cli"
+version = "0.6.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "flate2",
+ "ratelab",
+ "serde_json",
+ "sim",
+]
+
+[[package]]
 name = "raw-cpuid"
 version = "11.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
