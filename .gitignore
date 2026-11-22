@@ -10,3 +10,4 @@ web/src/wasm-pkg/
 web/public/data/
 web/test-results/
 web/playwright-report/
+docs/story/
